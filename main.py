@@ -27,7 +27,7 @@ except Exception as e:
 # 🛠 משתנים מ־Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
-YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:000/M0000")
+YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/987")
 
 # 🔢 המרת מספרים לעברית (כרגע לא בשימוש)
 def num_to_hebrew_words(hour, minute):
