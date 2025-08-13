@@ -100,9 +100,7 @@ def text_to_mp3(text, filename='output.mp3'):
         ssml_gender=texttospeech.SsmlVoiceGender.MALE
     )
     audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3,
-        speaking_rate=1.1,
-        pitch=2.0
+        audio_encoding=texttospeech.AudioEncoding.MP3
     )
     response = client.synthesize_speech(
         input=synthesis_input,
