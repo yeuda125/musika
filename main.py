@@ -27,9 +27,9 @@ except Exception as e:
 # 🛠 משתנים מ־Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
-YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/987")
+YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988")
 
-# 🔢 המרת מספרים לעברית (כרגע לא בשימוש)
+# 🔢 המרת מספרים לעברית
 def num_to_hebrew_words(hour, minute):
     hours_map = {
         1: "אחת", 2: "שתיים", 3: "שלוש", 4: "ארבע", 5: "חמש",
@@ -61,17 +61,9 @@ def num_to_hebrew_words(hour, minute):
     hour_12 = hour % 12 or 12
     return f"{hours_map[hour_12]} {minutes_map[minute]}"
 
-# 🆕 המרת מספר יום לשם יום בעברית
-def get_hebrew_day():
-    days_map = {
-        0: "יום שני", 1: "יום שלישי", 2: "יום רביעי",
-        3: "יום חמישי", 4: "יום שישי", 5: "יום שבת", 6: "יום ראשון"
-    }
-    # datetime.weekday() -> שני=0 ... ראשון=6
-    today = datetime.now(pytz.timezone("Asia/Jerusalem")).weekday()
-    return days_map[today]
-
 def clean_text(text):
+    import re
+
     BLOCKED_PHRASES = sorted([
         "חדשות המוקד • בטלגרם: t.me/hamoked_il",
         "בוואטסאפ: https://chat.whatsapp.com/LoxVwdYOKOAH2y2kaO8GQ7",
@@ -95,9 +87,9 @@ def clean_text(text):
 
     return text
 
-# ✅ שינוי: הוספת היום + "במוזיקה אקספרס" לפני הטקסט
+# ✅ שינוי: החזרת טקסט נקי בלבד ללא שעה וכותרת
 def create_full_text(text):
-    return f"{get_hebrew_day()} במוזיקה אקספרס. {text}"
+    return text
 
 def text_to_mp3(text, filename='output.mp3'):
     client = texttospeech.TextToSpeechClient()
@@ -140,13 +132,13 @@ def upload_to_ymot(wav_file_path):
     print("📞 תגובת ימות:", response.text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = update.message or update.channel_post
+    message = update.message
     if not message:
         return
 
     text = message.text or message.caption
     has_video = message.video is not None
-    has_audio = message.voice or message.audio
+    has_audio = message.voice or message.audio  # ✅ תוספת: גם אודיו
 
     if has_video:
         video_file = await message.video.get_file()
@@ -177,10 +169,7 @@ from keep_alive import keep_alive
 keep_alive()
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
+app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), handle_message))
 
-# 🆕 שינוי: מאזין גם להודעות בערוץ שבו הבוט אדמין (channel_post)
-app.add_handler(MessageHandler((filters.ALL & (~filters.COMMAND)), handle_message))
-app.add_handler(MessageHandler(filters.UpdateType.CHANNEL_POST, handle_message))
-
-print("🚀 הבוט עלה! הוא מאזין לערוץ שבו הוא אדמין ומעלה הודעות לשלוחה 🎧")
+print("🚀 הבוט עלה! שלח טקסט, תמונה או וידאו – והוא יוקרא ויושמע בשלוחה 🎧")
 app.run_polling()
