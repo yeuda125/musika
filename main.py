@@ -81,6 +81,7 @@ def clean_text(text):
         "לצפייה ביוטיוב",
         "לצפיה",
         "ביוטיוב",
+        "t.me/music_ms2",
         "https://chat.whatsapp.com/CD7EpONUdKm7z7rAhfa6ZV",
         "http://t.me/music_ms2",
         "בטלגרם",
