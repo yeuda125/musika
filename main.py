@@ -96,7 +96,7 @@ def clean_text(text):
     for phrase in BLOCKED_PHRASES:
         text = text.replace(phrase, '')
 
-    # שים לב: לא מוחקים כאן קישורים, כדי שישארו בהודעה שנשלחת ל-Ymot
+    # ❌ כאן נשמור הכל להודעה אבל TTS יקרא רק עברית
     text = re.sub(r'[^\w\s.,!?()\u0590-\u05FF:/]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
@@ -174,9 +174,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 🟢 שמירה של הטקסט המקורי (כולל הקישורים) ל-Ymot
         original_text = text
 
-        # 🟢 לנאום – ננקה את הקישורים שלא יוקראו
-        cleaned_for_tts = re.sub(r'https?://\S+', '', original_text)
-        cleaned_for_tts = re.sub(r'www\.\S+', '', cleaned_for_tts)
+        # 🟢 לנאום – ננקה כל תו שאינו עברי
+        cleaned_for_tts = re.sub(r'[^א-ת\s.,!?()\u0590-\u05FF]', '', original_text)
         cleaned_for_tts = re.sub(r'\s+', ' ', cleaned_for_tts).strip()
 
         full_text = create_full_text(cleaned_for_tts)
