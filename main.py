@@ -7,6 +7,7 @@ from datetime import datetime
 import pytz
 import asyncio
 import re
+import time
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
@@ -95,9 +96,8 @@ def clean_text(text):
     for phrase in BLOCKED_PHRASES:
         text = text.replace(phrase, '')
 
-    text = re.sub(r'https?://\S+', '', text)
-    text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'[^\w\s.,!?()\u0590-\u05FF]', '', text)
+    # שים לב: לא מוחקים כאן קישורים, כדי שישארו בהודעה שנשלחת ל-Ymot
+    text = re.sub(r'[^\w\s.,!?()\u0590-\u05FF:/]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
     return text
@@ -171,8 +171,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove("audio.wav")
 
     if text:
-        cleaned = clean_text(text)
-        full_text = create_full_text(cleaned)
+        # 🟢 שמירה של הטקסט המקורי (כולל הקישורים) ל-Ymot
+        original_text = text
+
+        # 🟢 לנאום – ננקה את הקישורים שלא יוקראו
+        cleaned_for_tts = re.sub(r'https?://\S+', '', original_text)
+        cleaned_for_tts = re.sub(r'www\.\S+', '', cleaned_for_tts)
+        cleaned_for_tts = re.sub(r'\s+', ' ', cleaned_for_tts).strip()
+
+        full_text = create_full_text(cleaned_for_tts)
         text_to_mp3(full_text, "output.mp3")
         convert_to_wav("output.mp3", "output.wav")
         upload_to_ymot("output.wav")
