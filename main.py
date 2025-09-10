@@ -200,18 +200,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     has_audio = message.voice or message.audio
 
     if has_video:
-        video_file = await message.video.get_file()
-        url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{video_file.file_path}"
-        resp = requests.get(url, stream=True)
-        with open("video.mp4", "wb") as f:
-            for chunk in resp.iter_content(1024 * 1024):
-                f.write(chunk)
+    video_file = await message.video.get_file()
+    # ❌ אל תשתמש download_to_drive עבור קבצים גדולים
+    # await video_file.download_to_drive("video.mp4")
 
+    # ✅ הורדה ישירה בקבצים גדולים
+    url = video_file.file_path
+    resp = requests.get(url, stream=True)
+    with open("video.mp4", "wb") as f:
+        for chunk in resp.iter_content(1024*1024):  # הורדה ב־1MB chunks
+            f.write(chunk)
 
-        convert_to_wav("video.mp4", "video.wav")
-        upload_to_ymot("video.wav")
-        os.remove("video.mp4")
-        os.remove("video.wav")
+    convert_to_wav("video.mp4", "video.wav")
+    upload_to_ymot("video.wav")
+    os.remove("video.mp4")
+    os.remove("video.wav")
 
     if has_audio:
         audio_file = await (message.voice or message.audio).get_file()
