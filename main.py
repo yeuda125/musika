@@ -201,11 +201,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if has_video:
         video_file = await message.video.get_file()
-        await video_file.download_to_drive("video.mp4")
-        convert_to_wav("video.mp4", "video.wav")
-        upload_to_ymot("video.wav")
-        os.remove("video.mp4")
-        os.remove("video.wav")
+url = video_file.file_path
+resp = requests.get(url, stream=True)
+with open("video.mp4", "wb") as f:
+    for chunk in resp.iter_content(1024 * 1024):
+        f.write(chunk)
+convert_to_wav("video.mp4", "video.wav")
+upload_to_ymot("video.wav")
+os.remove("video.mp4")
+os.remove("video.wav")
 
     if has_audio:
         audio_file = await (message.voice or message.audio).get_file()
