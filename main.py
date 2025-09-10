@@ -3,6 +3,7 @@ import json
 import subprocess
 import requests
 import base64
+import uuid
 from datetime import datetime
 import pytz
 import asyncio
@@ -28,7 +29,7 @@ except Exception as e:
 # 🛠 משתנים מ־Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
-YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988")
+YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/97")
 
 # 🔢 המרת מספרים לעברית
 def num_to_hebrew_words(hour, minute):
@@ -37,7 +38,6 @@ def num_to_hebrew_words(hour, minute):
         6: "שש", 7: "שבע", 8: "שמונה", 9: "תשע", 10: "עשר",
         11: "אחת עשרה", 12: "שתים עשרה"
     }
-
     minutes_map = {
         0: "", 1: "ודקה", 2: "ושתי דקות", 3: "ושלוש דקות", 4: "וארבע דקות", 5: "וחמש דקות",
         6: "ושש דקות", 7: "ושבע דקות", 8: "ושמונה דקות", 9: "ותשע דקות", 10: "ועשרה",
@@ -58,13 +58,10 @@ def num_to_hebrew_words(hour, minute):
         55: "חמישים וחמש", 56: "חמישים ושש", 57: "חמישים ושבע",
         58: "חמישים ושמונה", 59: "חמישים ותשע"
     }
-
     hour_12 = hour % 12 or 12
     return f"{hours_map[hour_12]} {minutes_map[minute]}"
 
 def clean_text(text):
-    import re
-
     BLOCKED_PHRASES = sorted([
         "חדשות המוקד • בטלגרם: t.me/hamoked_il",
         "בוואטסאפ: https://chat.whatsapp.com/LoxVwdYOKOAH2y2kaO8GQ7",
@@ -96,13 +93,11 @@ def clean_text(text):
     for phrase in BLOCKED_PHRASES:
         text = text.replace(phrase, '')
 
-    # ❌ כאן נשמור הכל להודעה אבל TTS יקרא רק עברית
+    # נשמור הכל להודעה, אבל TTS יקרא רק עברית
     text = re.sub(r'[^\w\s.,!?()\u0590-\u05FF:/]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
-
     return text
 
-# ✅ שינוי: החזרת טקסט נקי בלבד ללא שעה וכותרת
 def create_full_text(text):
     return text
 
@@ -116,7 +111,7 @@ def text_to_mp3(text, filename='output.mp3'):
     )
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3,
-        speaking_rate=1.2  # 🔹 מהירות הקראה מוגברת
+        speaking_rate=1.2
     )
     response = client.synthesize_speech(
         input=synthesis_input,
@@ -132,7 +127,57 @@ def convert_to_wav(input_file, output_file='output.wav'):
         output_file, '-y'
     ])
 
+def upload_large_to_ymot(file_path):
+    """העלאת קובץ גדול (מעל 20MB) לימות המשיח בחלקים"""
+    url = "https://call2all.co.il/ym/api/UploadFile"
+    file_size = os.path.getsize(file_path)
+    chunk_size = 4 * 1024 * 1024  # 4MB
+    total_parts = (file_size + chunk_size - 1) // chunk_size
+    qquuid = str(uuid.uuid4())
+    filename = os.path.basename(file_path)
+
+    with open(file_path, "rb") as f:
+        for part_index in range(total_parts):
+            chunk = f.read(chunk_size)
+            offset = part_index * chunk_size
+            files = {"qqfile": (filename, chunk, "application/octet-stream")}
+            data = {
+                "token": YMOT_TOKEN,
+                "path": YMOT_PATH,
+                "convertAudio": "1",
+                "autoNumbering": "true",
+                "qquuid": qquuid,
+                "qqpartindex": part_index,
+                "qqpartbyteoffset": offset,
+                "qqchunksize": len(chunk),
+                "qqtotalparts": total_parts,
+                "qqtotalfilesize": file_size,
+                "qqfilename": filename,
+                "uploader": "yemot-admin"
+            }
+            resp = requests.post(url, data=data, files=files)
+            print(f"📤 חלק {part_index+1}/{total_parts} הועלה:", resp.text)
+
+    # סיום העלאה
+    done_data = {
+        "token": YMOT_TOKEN,
+        "path": YMOT_PATH,
+        "convertAudio": "1",
+        "autoNumbering": "true",
+        "qquuid": qquuid,
+        "qqfilename": filename,
+        "qqtotalfilesize": file_size,
+        "qqtotalparts": total_parts,
+    }
+    done_resp = requests.post(url + "?done", data=done_data)
+    print("✅ סיום העלאה:", done_resp.text)
+
 def upload_to_ymot(wav_file_path):
+    """העלאת קובץ רגיל או גדול לימות המשיח"""
+    file_size = os.path.getsize(wav_file_path)
+    if file_size > 20 * 1024 * 1024:
+        print("⚠️ קובץ גדול – משתמש בהעלאה בחלקים...")
+        return upload_large_to_ymot(wav_file_path)
     url = 'https://call2all.co.il/ym/api/UploadFile'
     with open(wav_file_path, 'rb') as f:
         files = {'file': (os.path.basename(wav_file_path), f, 'audio/wav')}
@@ -152,7 +197,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = message.text or message.caption
     has_video = message.video is not None
-    has_audio = message.voice or message.audio  # ✅ תוספת: גם אודיו
+    has_audio = message.voice or message.audio
 
     if has_video:
         video_file = await message.video.get_file()
@@ -171,10 +216,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove("audio.wav")
 
     if text:
-        # 🟢 שמירה של הטקסט המקורי (כולל הקישורים) ל-Ymot
         original_text = text
-
-        # 🟢 לנאום – ננקה כל תו שאינו עברי
         cleaned_for_tts = re.sub(r'[^א-ת\s.,!?()\u0590-\u05FF]', '', original_text)
         cleaned_for_tts = re.sub(r'\s+', ' ', cleaned_for_tts).strip()
 
@@ -193,14 +235,13 @@ app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), handle_message)
 
 print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה 🎧")
 
-# ▶️ לולאת הרצה אינסופית
 while True:
     try:
         app.run_polling(
-            poll_interval=2.0,   # כל כמה שניות לבדוק הודעות חדשות
-            timeout=30,          # כמה זמן לחכות לפני שנזרקת שגיאת TimedOut
-            allowed_updates=Update.ALL_TYPES  # לוודא שכל סוגי ההודעות נתפסים
+            poll_interval=2.0,
+            timeout=30,
+            allowed_updates=Update.ALL_TYPES
         )
     except Exception as e:
         print("❌ שגיאה כללית בהרצת הבוט:", e)
-        time.sleep(5)  # לחכות 5 שניות ואז להפעיל מחדש את הבוט
+        time.sleep(5)
