@@ -1,4 +1,4 @@
-import os
+os os
 import json
 import subprocess
 import requests
@@ -33,7 +33,7 @@ YMOT_TOKEN = os.getenv("YMOT_TOKEN")
 YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
 
 # 🟡 הגדרות קבועות
-CHUNK_SIZE = 4 * 1024 * 1024  # 4MB
+CHUNK_SIZE = 1 * 1024 * 1024  # 4MB
 UPLOAD_URL = "https://call2all.co.il/ym/api/UploadFile"
 
 
