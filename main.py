@@ -163,11 +163,12 @@ async def handle_message(client, message):
         os.remove(wav_file)
 
     if has_audio:
-        audio_file = await (message.voice or message.audio).download("audio.ogg")
-        convert_to_wav("audio.ogg", "audio.wav")
-        upload_to_ymot("audio.wav")
-        os.remove("audio.ogg")
-        os.remove("audio.wav")
+        audio_file = await (message.voice or message.audio).download()
+        wav_file = "audio.wav"
+        convert_to_wav(audio_file, wav_file)
+        upload_to_ymot(wav_file)
+        os.remove(audio_file)
+        os.remove(wav_file)
 
     if text:
         cleaned_for_tts = re.sub(r"[^א-ת\s.,!?()\u0590-\u05FF]", "", text)
