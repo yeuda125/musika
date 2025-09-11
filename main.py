@@ -4,6 +4,10 @@ import subprocess
 import requests
 import base64
 import uuid
+import uuid
+import requests
+from pyrogram import Client
+from pyrogram.types import InputFile
 from datetime import datetime
 import pytz
 import asyncio
@@ -30,6 +34,11 @@ except Exception as e:
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
 YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988")
+API_ID = os.getenv("API_ID")  # צריך להירשם ב-https://my.telegram.org
+API_HASH = os.getenv("API_HASH")  # שם משתמש וסיסמא
+
+# יצירת אובייקט של Pyrogram
+app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # 🔢 המרת מספרים לעברית
 def num_to_hebrew_words(hour, minute):
@@ -133,14 +142,13 @@ def convert_to_wav(input_file, output_file='output.wav'):
         output_file, '-y'
     ])
 
-def upload_large_to_ymot(file_path):
-    """העלאת קובץ גדול (מעל 20MB) לימות המשיח בחלקים"""
-    url = "https://call2all.co.il/ym/api/UploadFile"
+async def upload_to_ymot_with_pyrogram(file_path):
+    """העלאת קובץ עם Pyrogram לימות המשיח"""
     file_size = os.path.getsize(file_path)
-    chunk_size = 4 * 1024 * 1024  # 4MB
-    total_parts = (file_size + chunk_size - 1) // chunk_size
-    qquuid = str(uuid.uuid4())  # יצירת UUID ייחודי
-    filename = os.path.basename(file_path)
+    if file_size > 50 * 1024 * 1024:  # אם הקובץ גדול מ-50MB
+        print("⚠️ קובץ גדול, מפצל להעלאה.")
+        # במקרה כזה, יש לפצל את הקובץ לחלקים
+        return upload_large_to_ymot(file_path)
 
     with open(file_path, "rb") as f:
         for part_index in range(total_parts):
