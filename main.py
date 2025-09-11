@@ -100,7 +100,7 @@ def upload_to_ymot(file_path):
             response = requests.post(UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות:", response.text)
     else:
-        # 🔹 Chunk Upload
+        # 🔹 העלאה ב־Chunks
         qquuid = str(uuid.uuid4())
         total_parts = math.ceil(file_size / CHUNK_SIZE)
         filename = os.path.basename(file_path)
@@ -117,17 +117,33 @@ def upload_to_ymot(file_path):
                     "convertAudio": "1",
                     "autoNumbering": "true",
                     "qquuid": qquuid,
-                    "qqpartindex": part_index,       # מתחיל מ-0
+                    "qqpartindex": part_index,
                     "qqpartbyteoffset": byte_offset,
                     "qqchunksize": len(chunk),
-                    "qqtotalparts": total_parts,     # סה"כ חלקים (לא פחות 1)
+                    "qqtotalparts": total_parts,
                     "qqtotalfilesize": file_size,
                     "qqfilename": filename,
                     "uploader": "yemot-admin"
                 }
 
-                response = requests.post(UPLOAD_URL, data=data, files=files)
-                print(f"⬆️ חלק {part_index+1}/{total_parts} הועלה:", response.text)
+                # 🔁 Retry עד 3 פעמים
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = requests.post(
+                            UPLOAD_URL,
+                            data=data,
+                            files=files,
+                            timeout=180
+                        )
+                        response.raise_for_status()
+                        print(f"⬆️ חלק {part_index+1}/{total_parts} הועלה:", response.text)
+                        break
+                    except Exception as e:
+                        print(f"❌ כשל בחלק {part_index+1}, ניסיון {attempt+1}: {e}")
+                        if attempt == max_retries - 1:
+                            raise
+                        time.sleep(5)
 
         # 🔹 בקשת סיום
         data = {
