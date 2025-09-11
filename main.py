@@ -155,11 +155,12 @@ async def handle_message(client, message):
     has_audio = message.voice or message.audio
 
     if has_video:
-        video_file = await message.download("video.mp4")
-        convert_to_wav("video.mp4", "video.wav")
-        upload_to_ymot("video.wav")
+        video_file = await message.download()  # מחזיר את הנתיב המלא
+        wav_file = "video.wav"
+        convert_to_wav(video_file, wav_file)
+        upload_to_ymot(wav_file)
         os.remove(video_file)
-        os.remove("video.wav")
+        os.remove(wav_file)
 
     if has_audio:
         audio_file = await (message.voice or message.audio).download("audio.ogg")
