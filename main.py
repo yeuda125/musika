@@ -182,19 +182,5 @@ async def handle_message(client, message):
 from keep_alive import keep_alive
 keep_alive()
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), handle_message))
-
 print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה 🎧")
-
-# ▶️ לולאת הרצה אינסופית
-while True:
-    try:
-        app.run_polling(
-            poll_interval=2.0,   # כל כמה שניות לבדוק הודעות חדשות
-            timeout=30,          # כמה זמן לחכות לפני שנזרקת שגיאת TimedOut
-            allowed_updates=Update.ALL_TYPES  # לוודא שכל סוגי ההודעות נתפסים
-        )
-    except Exception as e:
-        print("❌ שגיאה כללית בהרצת הבוט:", e)
-        time.sleep(5)  # לחכות 5 שניות ואז להפעיל מחדש את הבוט
+app.run()
