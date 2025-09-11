@@ -148,7 +148,7 @@ def upload_to_ymot(file_path):
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
 
 
-@app.on_message(filters.chat(["@catava479"]))
+@app.on_message(filters.chat("@catava479"))
 async def handle_message(client, message):
     text = message.text or message.caption
     has_video = message.video is not None
