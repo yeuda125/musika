@@ -93,12 +93,12 @@ def upload_to_ymot(file_path):
             files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
-                "path": YMOT_PATH,
-                "convertAudio": "1",
-                "autoNumbering": "true"
+                "path": YMOT_PATH,  # ivr2:988/ (סיום ב־"/" בשביל autoNumbering)
+                "autoNumbering": True
             }
             response = requests.post(UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות:", response.text)
+
     else:
         # 🔹 העלאה ב־Chunks
         qquuid = str(uuid.uuid4())
@@ -114,8 +114,7 @@ def upload_to_ymot(file_path):
                 data = {
                     "token": YMOT_TOKEN,
                     "path": YMOT_PATH,
-                    "convertAudio": "1",
-                    "autoNumbering": "true",
+                    "autoNumbering": True,
                     "qquuid": qquuid,
                     "qqpartindex": part_index,
                     "qqpartbyteoffset": byte_offset,
@@ -126,9 +125,7 @@ def upload_to_ymot(file_path):
                     "uploader": "yemot-admin"
                 }
 
-                # 🔁 Retry עד 3 פעמים
-                max_retries = 3
-                for attempt in range(max_retries):
+                for attempt in range(3):
                     try:
                         response = requests.post(
                             UPLOAD_URL,
@@ -141,7 +138,7 @@ def upload_to_ymot(file_path):
                         break
                     except Exception as e:
                         print(f"❌ כשל בחלק {part_index+1}, ניסיון {attempt+1}: {e}")
-                        if attempt == max_retries - 1:
+                        if attempt == 2:
                             raise
                         time.sleep(5)
 
@@ -149,8 +146,7 @@ def upload_to_ymot(file_path):
         data = {
             "token": YMOT_TOKEN,
             "path": YMOT_PATH,
-            "convertAudio": "1",
-            "autoNumbering": "true",
+            "autoNumbering": True,
             "qquuid": qquuid,
             "qqfilename": filename,
             "qqtotalfilesize": file_size,
