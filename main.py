@@ -117,10 +117,10 @@ def upload_to_ymot(file_path):
                     "convertAudio": "1",
                     "autoNumbering": "true",
                     "qquuid": qquuid,
-                    "qqpartindex": part_index,
+                    "qqpartindex": part_index,       # מתחיל מ-0
                     "qqpartbyteoffset": byte_offset,
                     "qqchunksize": len(chunk),
-                    "qqtotalparts": total_parts,
+                    "qqtotalparts": total_parts,     # סה"כ חלקים (לא פחות 1)
                     "qqtotalfilesize": file_size,
                     "qqfilename": filename,
                     "uploader": "yemot-admin"
