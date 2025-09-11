@@ -158,7 +158,7 @@ async def handle_message(client, message):
         video_file = await message.download("video.mp4")
         convert_to_wav("video.mp4", "video.wav")
         upload_to_ymot("video.wav")
-        os.remove("video.mp4")
+        os.remove(video_file)
         os.remove("video.wav")
 
     if has_audio:
