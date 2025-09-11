@@ -1,132 +1,184 @@
 import os
-import uuid
-import requests
-from pyrogram import Client
-from pyrogram.types import InputFile
+import json
 import subprocess
-import time
+import requests
+import base64
+import uuid
+import math
+from datetime import datetime
+import pytz
+import asyncio
 import re
+import time
 
-# משתנים
+from pyrogram import Client, filters
+from google.cloud import texttospeech
+
+# 🟡 כתיבת קובץ מפתח Google מ־BASE64
+key_b64 = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_B64")
+if not key_b64:
+    raise Exception("❌ משתנה GOOGLE_APPLICATION_CREDENTIALS_B64 לא מוגדר או ריק")
+
+try:
+    with open("google_key.json", "wb") as f:
+        f.write(base64.b64decode(key_b64))
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_key.json"
+except Exception as e:
+    raise Exception("❌ נכשל בכתיבת קובץ JSON מ־BASE64: " + str(e))
+
+# 🛠 משתנים מ־Render
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
 YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988")
-API_ID = os.getenv("API_ID")
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# יצירת אובייקט של Pyrogram
-app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# 🟡 הגדרות קבועות
+CHUNK_SIZE = 4 * 1024 * 1024  # 4MB
+UPLOAD_URL = "https://call2all.co.il/ym/api/UploadFile"
 
-async def upload_large_to_ymot(file_path):
-    """העלאת קובץ גדול לימות המשיח בחלקים"""
-    url = "https://call2all.co.il/ym/api/UploadFile"
+
+def clean_text(text):
+    BLOCKED_PHRASES = sorted([
+        "חדשות המוקד • בטלגרם: t.me/hamoked_il",
+        "בוואטסאפ: https://chat.whatsapp.com/LoxVwdYOKOAH2y2kaO8GQ7",
+        "לעדכוני הפרגוד בטלגרם",
+    ], key=len, reverse=True)
+
+    for phrase in BLOCKED_PHRASES:
+        text = text.replace(phrase, '')
+
+    text = re.sub(r'[^\w\s.,!?()\u0590-\u05FF:/]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def create_full_text(text):
+    return text
+
+
+def text_to_mp3(text, filename="output.mp3"):
+    client = texttospeech.TextToSpeechClient()
+    synthesis_input = texttospeech.SynthesisInput(text=text)
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="he-IL",
+        name="he-IL-Wavenet-B",
+        ssml_gender=texttospeech.SsmlVoiceGender.MALE
+    )
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=1.2
+    )
+    response = client.synthesize_speech(
+        input=synthesis_input,
+        voice=voice,
+        audio_config=audio_config
+    )
+    with open(filename, "wb") as out:
+        out.write(response.audio_content)
+
+
+def convert_to_wav(input_file, output_file="output.wav"):
+    subprocess.run([
+        "ffmpeg", "-i", input_file, "-ar", "8000", "-ac", "1", "-f", "wav",
+        output_file, "-y"
+    ])
+
+
+def upload_to_ymot(file_path):
     file_size = os.path.getsize(file_path)
-    chunk_size = 4 * 1024 * 1024  # גודל כל חלק (4MB)
-    total_parts = (file_size + chunk_size - 1) // chunk_size
-    qquuid = str(uuid.uuid4())
-    filename = os.path.basename(file_path)
 
-    # העלאה בחלקים
-    with open(file_path, "rb") as f:
-        for part_index in range(total_parts):
-            chunk = f.read(chunk_size)
-            offset = part_index * chunk_size
-            files = {"qqfile": (filename, chunk, "application/octet-stream")}
+    if file_size <= 50 * 1024 * 1024:
+        # 🔹 העלאה רגילה
+        with open(file_path, "rb") as f:
+            files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
                 "path": YMOT_PATH,
                 "convertAudio": "1",
-                "autoNumbering": "true",
-                "qquuid": qquuid,
-                "qqpartindex": part_index,
-                "qqpartbyteoffset": offset,
-                "qqchunksize": len(chunk),
-                "qqtotalparts": total_parts,
-                "qqtotalfilesize": file_size,
-                "qqfilename": filename,
-                "uploader": "yemot-admin"
+                "autoNumbering": "true"
             }
-            resp = requests.post(url, data=data, files=files)
-            print(f"📤 חלק {part_index+1}/{total_parts} הועלה:", resp.text)
+            response = requests.post(UPLOAD_URL, data=data, files=files)
+        print("📞 תגובת ימות:", response.text)
+    else:
+        # 🔹 Chunk Upload
+        qquuid = str(uuid.uuid4())
+        total_parts = math.ceil(file_size / CHUNK_SIZE)
+        filename = os.path.basename(file_path)
 
-    # סיום העלאה
-    done_data = {
-        "token": YMOT_TOKEN,
-        "path": YMOT_PATH,
-        "convertAudio": "1",
-        "autoNumbering": "true",
-        "qquuid": qquuid,
-        "qqfilename": filename,
-        "qqtotalfilesize": file_size,
-        "qqtotalparts": total_parts,
-    }
-    done_resp = requests.post(url + "?done", data=done_data)
-    print("✅ סיום העלאה:", done_resp.text)
+        with open(file_path, "rb") as f:
+            for part_index in range(total_parts):
+                chunk = f.read(CHUNK_SIZE)
+                byte_offset = part_index * CHUNK_SIZE
 
-async def upload_to_ymot(file_path):
-    """העלאת קובץ רגיל או גדול לימות המשיח"""
-    file_size = os.path.getsize(file_path)
-    if file_size > 50 * 1024 * 1024:  # אם הקובץ גדול מ-50MB
-        print("⚠️ קובץ גדול – משתמש בהעלאה בחלקים...")
-        await upload_large_to_ymot(file_path)
-        return
+                files = {"qqfile": (filename, chunk, "application/octet-stream")}
+                data = {
+                    "token": YMOT_TOKEN,
+                    "path": YMOT_PATH,
+                    "convertAudio": "1",
+                    "autoNumbering": "true",
+                    "qquuid": qquuid,
+                    "qqpartindex": part_index,
+                    "qqpartbyteoffset": byte_offset,
+                    "qqchunksize": len(chunk),
+                    "qqtotalparts": total_parts,
+                    "qqtotalfilesize": file_size,
+                    "qqfilename": filename,
+                    "uploader": "yemot-admin"
+                }
 
-    url = 'https://call2all.co.il/ym/api/UploadFile'
-    with open(file_path, 'rb') as f:
-        files = {'file': (os.path.basename(file_path), f, 'audio/wav')}
+                response = requests.post(UPLOAD_URL, data=data, files=files)
+                print(f"⬆️ חלק {part_index+1}/{total_parts} הועלה:", response.text)
+
+        # 🔹 בקשת סיום
         data = {
-            'token': YMOT_TOKEN,
-            'path': YMOT_PATH,
-            'convertAudio': '1',  # המרת הקובץ ל־WAV
-            'autoNumbering': 'true'
+            "token": YMOT_TOKEN,
+            "path": YMOT_PATH,
+            "convertAudio": "1",
+            "autoNumbering": "true",
+            "qquuid": qquuid,
+            "qqfilename": filename,
+            "qqtotalfilesize": file_size,
+            "qqtotalparts": total_parts
         }
-        response = requests.post(url, data=data, files=files)
-    print("📞 תגובת ימות:", response.text)
+        response = requests.post(UPLOAD_URL + "?done", data=data)
+        print("✅ סיום העלאה:", response.text)
 
-async def handle_message(update, context):
-    message = update.message
-    if not message:
-        return
 
+# 🟡 UserBot
+app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
+
+
+@app.on_message(filters.chat(["@catava479"]))
+async def handle_message(client, message):
     text = message.text or message.caption
     has_video = message.video is not None
     has_audio = message.voice or message.audio
 
     if has_video:
-        video_file = await message.video.get_file()
-        url = video_file.file_path
-        resp = requests.get(url, stream=True)
-        with open("video.mp4", "wb") as f:
-            for chunk in resp.iter_content(1024 * 1024):  # הורדה ב־1MB chunks
-                f.write(chunk)
-
+        video_file = await message.download("video.mp4")
         convert_to_wav("video.mp4", "video.wav")
-        await upload_to_ymot("video.wav")
+        upload_to_ymot("video.wav")
         os.remove("video.mp4")
         os.remove("video.wav")
 
     if has_audio:
-        audio_file = await (message.voice or message.audio).get_file()
-        await audio_file.download_to_drive("audio.ogg")
+        audio_file = await (message.voice or message.audio).download("audio.ogg")
         convert_to_wav("audio.ogg", "audio.wav")
-        await upload_to_ymot("audio.wav")
+        upload_to_ymot("audio.wav")
         os.remove("audio.ogg")
         os.remove("audio.wav")
 
     if text:
-        original_text = text
-        cleaned_for_tts = re.sub(r'[^א-ת\s.,!?()\u0590-\u05FF]', '', original_text)
-        cleaned_for_tts = re.sub(r'\s+', ' ', cleaned_for_tts).strip()
+        cleaned_for_tts = re.sub(r"[^א-ת\s.,!?()\u0590-\u05FF]", "", text)
+        cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
         full_text = create_full_text(cleaned_for_tts)
         text_to_mp3(full_text, "output.mp3")
         convert_to_wav("output.mp3", "output.wav")
-        await upload_to_ymot("output.wav")
+        upload_to_ymot("output.wav")
         os.remove("output.mp3")
         os.remove("output.wav")
 
-# הפעלת הבוט
-app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), handle_message))
 
 print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה 🎧")
 app.run()
