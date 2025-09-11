@@ -87,17 +87,21 @@ def convert_to_wav(input_file, output_file="output.wav"):
 def upload_to_ymot(file_path):
     file_size = os.path.getsize(file_path)
 
+def upload_to_ymot(file_path):
+    file_size = os.path.getsize(file_path)
+
     if file_size <= 50 * 1024 * 1024:
         # 🔹 העלאה רגילה
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
-                "path": YMOT_PATH,  # ivr2:988/ (סיום ב־"/" בשביל autoNumbering)
-                "autoNumbering": True
+                "path": YMOT_PATH,       # לדוגמה: ivr2:988/
+                "convertAudio": "1",     # חובה אם זה קובץ לא בפורמט טלפוניה
+                "autoNumbering": "true"  # מחרוזת! לא True/False
             }
             response = requests.post(UPLOAD_URL, data=data, files=files)
-        print("📞 תגובת ימות:", response.text)
+        print("📞 תגובת ימות (upload רגיל):", response.text)
 
     else:
         # 🔹 העלאה ב־Chunks
@@ -114,7 +118,8 @@ def upload_to_ymot(file_path):
                 data = {
                     "token": YMOT_TOKEN,
                     "path": YMOT_PATH,
-                    "autoNumbering": True,
+                    "convertAudio": "1",
+                    "autoNumbering": "true",
                     "qquuid": qquuid,
                     "qqpartindex": part_index,
                     "qqpartbyteoffset": byte_offset,
@@ -125,6 +130,7 @@ def upload_to_ymot(file_path):
                     "uploader": "yemot-admin"
                 }
 
+                # 🔁 Retry עד 3 פעמים
                 for attempt in range(3):
                     try:
                         response = requests.post(
@@ -146,7 +152,8 @@ def upload_to_ymot(file_path):
         data = {
             "token": YMOT_TOKEN,
             "path": YMOT_PATH,
-            "autoNumbering": True,
+            "convertAudio": "1",
+            "autoNumbering": "true",
             "qquuid": qquuid,
             "qqfilename": filename,
             "qqtotalfilesize": file_size,
