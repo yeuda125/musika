@@ -87,9 +87,6 @@ def convert_to_wav(input_file, output_file="output.wav"):
 def upload_to_ymot(file_path):
     file_size = os.path.getsize(file_path)
 
-def upload_to_ymot(file_path):
-    file_size = os.path.getsize(file_path)
-
     if file_size <= 50 * 1024 * 1024:
         # 🔹 העלאה רגילה
         with open(file_path, "rb") as f:
@@ -130,7 +127,6 @@ def upload_to_ymot(file_path):
                     "uploader": "yemot-admin"
                 }
 
-                # 🔁 Retry עד 3 פעמים
                 for attempt in range(3):
                     try:
                         response = requests.post(
@@ -148,19 +144,19 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-# 🔹 בקשת סיום
-data = {
-    "token": YMOT_TOKEN,
-    "path": YMOT_PATH,
-    "convertAudio": "1",      # חובה שיהיה
-    "autoNumbering": "true",  # חובה שיהיה מחרוזת
-    "qquuid": qquuid,
-    "qqfilename": filename,
-    "qqtotalfilesize": file_size,
-    "qqtotalparts": total_parts - 1   # ← כאן השינוי הקריטי
-}
-response = requests.post(UPLOAD_URL + "?done", data=data)
-print("✅ סיום העלאה:", response.text)
+        # 🔹 בקשת סיום (צריך להיות בתוך הפונקציה!)
+        data = {
+            "token": YMOT_TOKEN,
+            "path": YMOT_PATH,
+            "convertAudio": "1",
+            "autoNumbering": "true",
+            "qquuid": qquuid,
+            "qqfilename": filename,
+            "qqtotalfilesize": file_size,
+            "qqtotalparts": total_parts - 1   # 👈 זה קריטי
+        }
+        response = requests.post(UPLOAD_URL + "?done", data=data)
+        print("✅ סיום העלאה:", response.text)
 
 
 # 🟡 UserBot
