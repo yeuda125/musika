@@ -93,74 +93,71 @@ def upload_to_ymot(file_path):
             files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
-                "path": YMOT_PATH,
-                "convertAudio": "1",
-                "autoNumbering": "true"
+                "path": YMOT_PATH,       # למשל: ivr2:988/
+                "convertAudio": "1",     # חובה אם הקובץ לא כבר בפורמט טלפוניה
+                "autoNumbering": "true"  # מחרוזת! לא True/False
             }
             response = requests.post(UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות (upload רגיל):", response.text)
-        return
 
-    # 🔹 העלאה ב־Chunks
-    qquuid = str(uuid.uuid4())
-    total_parts = math.ceil(file_size / CHUNK_SIZE)
-    filename = os.path.basename(file_path)
+    else:
+        # 🔹 העלאה ב־Chunks
+        qquuid = str(uuid.uuid4())
+        total_parts = math.ceil(file_size / CHUNK_SIZE)
+        filename = os.path.basename(file_path)
 
-    with open(file_path, "rb") as f:
-        for part_index in range(total_parts):
-            chunk = f.read(CHUNK_SIZE)
-            byte_offset = part_index * CHUNK_SIZE
+        with open(file_path, "rb") as f:
+            for part_index in range(total_parts):
+                chunk = f.read(CHUNK_SIZE)
+                byte_offset = part_index * CHUNK_SIZE
 
-            files = {"qqfile": (filename, chunk, "application/octet-stream")}
-            data = {
-                "token": YMOT_TOKEN,
-                "path": YMOT_PATH,
-                "convertAudio": "1",
-                "autoNumbering": "true",
-                "qquuid": qquuid,
-                "qqpartindex": part_index,
-                "qqpartbyteoffset": byte_offset,
-                "qqchunksize": len(chunk),
-                "qqtotalparts": total_parts,
-                "qqtotalfilesize": file_size,
-                "qqfilename": filename,
-                "uploader": "yemot-admin"
-            }
+                files = {"qqfile": (filename, chunk, "application/octet-stream")}
+                data = {
+                    "token": YMOT_TOKEN,
+                    "path": YMOT_PATH,
+                    "convertAudio": "1",
+                    "autoNumbering": "true",
+                    "qquuid": qquuid,
+                    "qqpartindex": part_index,
+                    "qqpartbyteoffset": byte_offset,
+                    "qqchunksize": len(chunk),
+                    "qqtotalparts": total_parts,
+                    "qqtotalfilesize": file_size,
+                    "qqfilename": filename,
+                    "uploader": "yemot-admin"
+                }
 
-            for attempt in range(3):
-                try:
-                    response = requests.post(
-                        UPLOAD_URL,
-                        data=data,
-                        files=files,
-                        timeout=180
-                    )
-                    response.raise_for_status()
-                    print(f"⬆️ חלק {part_index+1}/{total_parts} הועלה:", response.text)
-                    break
-                except Exception as e:
-                    print(f"❌ כשל בחלק {part_index+1}, ניסיון {attempt+1}: {e}")
-                    if attempt == 2:
-                        raise
-                    time.sleep(5)
+                # 🔁 Retry עד 3 פעמים
+                for attempt in range(3):
+                    try:
+                        response = requests.post(
+                            UPLOAD_URL,
+                            data=data,
+                            files=files,
+                            timeout=180
+                        )
+                        response.raise_for_status()
+                        print(f"⬆️ חלק {part_index+1}/{total_parts} הועלה:", response.text)
+                        break
+                    except Exception as e:
+                        print(f"❌ כשל בחלק {part_index+1}, ניסיון {attempt+1}: {e}")
+                        if attempt == 2:
+                            raise
+                        time.sleep(5)
 
-    # ✅ בקשת סיום
-    try:
-        done_data = {
+        # 🔹 בקשת סיום
+        data = {
             "token": YMOT_TOKEN,
             "path": YMOT_PATH,
-            "convertAudio": "1",
-            "autoNumbering": "true",
-            "qquuid": qquuid,
-            "qqfilename": filename,
+            "convertAudio": "1",        # חובה
+            "autoNumbering": "true",    # חובה
+            "qquuid": qquuid,           # אותו מזהה כמו קודם
+            "qqfilename": filename,     # שם מקורי
             "qqtotalfilesize": file_size,
-            "qqtotalparts": total_parts - 1   # ⚠️ חובה - 0-index
+            "qqtotalparts": total_parts # ← בדיוק לפי התיעוד!
         }
-        response = requests.post(UPLOAD_URL + "?done", data=done_data, timeout=180)
-        response.raise_for_status()
+        response = requests.post(UPLOAD_URL + "?done", data=data)
         print("✅ סיום העלאה:", response.text)
-    except Exception as e:
-        print(f"❌ כשל בבקשת סיום: {e}")
 
 
 # 🟡 UserBot
