@@ -93,9 +93,9 @@ def upload_to_ymot(file_path):
             files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
-                "path": YMOT_PATH,       # לדוגמה: ivr2:988/
-                "convertAudio": "1",     # חובה אם זה קובץ לא בפורמט טלפוניה
-                "autoNumbering": "true"  # מחרוזת! לא True/False
+                "path": YMOT_PATH,
+                "convertAudio": "1",
+                "autoNumbering": "true"
             }
             response = requests.post(UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות (upload רגיל):", response.text)
@@ -144,7 +144,7 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-        # 🔹 בקשת סיום (צריך להיות בתוך הפונקציה!)
+        # ✅ בקשת סיום חייבת להיות כאן ולאחר סיום כל החלקים
         data = {
             "token": YMOT_TOKEN,
             "path": YMOT_PATH,
@@ -153,10 +153,14 @@ def upload_to_ymot(file_path):
             "qquuid": qquuid,
             "qqfilename": filename,
             "qqtotalfilesize": file_size,
-            "qqtotalparts": total_parts - 1   # 👈 זה קריטי
+            "qqtotalparts": total_parts - 1  # ⚠️ קריטי
         }
-        response = requests.post(UPLOAD_URL + "?done", data=data)
-        print("✅ סיום העלאה:", response.text)
+        try:
+            response = requests.post(UPLOAD_URL + "?done", data=data, timeout=180)
+            response.raise_for_status()
+            print("✅ סיום העלאה:", response.text)
+        except Exception as e:
+            print(f"❌ כשל בבקשת סיום: {e}")
 
 
 # 🟡 UserBot
