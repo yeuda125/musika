@@ -145,19 +145,30 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-        # 🔹 בקשת סיום
-        data = {
-            "token": YMOT_TOKEN,
-            "path": YMOT_PATH,
-            "convertAudio": "1",        # חובה
-            "autoNumbering": "true",    # חובה
-            "qquuid": qquuid,           # אותו מזהה כמו קודם
-            "qqfilename": filename,     # שם מקורי
-            "qqtotalfilesize": file_size,
-            "qqtotalparts": total_parts # ← בדיוק לפי התיעוד!
-        }
-        response = requests.post(UPLOAD_URL + "?done", data=data)
-        print("✅ סיום העלאה:", response.text)
+        # 🔹 בקשת סיום (במקרה של שגיאה)
+def finish_upload_with_retry():
+    data = {
+        "token": YMOT_TOKEN,
+        "path": YMOT_PATH,
+        "convertAudio": "1",
+        "autoNumbering": "true",
+        "qquuid": qquuid,           # אותו UUID כמו לפני כן
+        "qqfilename": filename,     # שם הקובץ המקורי
+        "qqtotalfilesize": file_size,
+        "qqtotalparts": total_parts  # מספר חלקי הקובץ
+    }
+
+    for attempt in range(3):  # נסה עד 3 פעמים
+        try:
+            response = requests.post(UPLOAD_URL + "?done", data=data)
+            response.raise_for_status()  # אם יש שגיאה בבקשה, תגרום לחריגה
+            print("✅ סיום העלאה:", response.text)
+            break  # יצא אחרי הצלחה
+        except Exception as e:
+            print(f"❌ כשלון בסיום העלאה, ניסיון {attempt+1}: {e}")
+            if attempt == 2:
+                raise  # אחרי 3 פעמים, זרוק חריגה
+            time.sleep(5)  # המתן לפני ניסיון נוסף
 
 
 # 🟡 UserBot
