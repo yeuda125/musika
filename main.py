@@ -84,7 +84,7 @@ def convert_to_wav(input_file, output_file="output.wav"):
     ])
 
 
-def upload_to_ymot(file_path):
+async def upload_to_ymot(file_path):
     file_size = os.path.getsize(file_path)
 
     if file_size <= 50 * 1024 * 1024:
@@ -97,7 +97,7 @@ def upload_to_ymot(file_path):
                 "convertAudio": "1",
                 "autoNumbering": "true"
             }
-            response = requests.post(UPLOAD_URL, data=data, files=files)
+            response = await asyncio.to_thread(requests.post, UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות (upload רגיל):", response.text)
 
     else:
@@ -129,12 +129,7 @@ def upload_to_ymot(file_path):
 
                 for attempt in range(3):
                     try:
-                        response = requests.post(
-                            UPLOAD_URL,
-                            data=data,
-                            files=files,
-                            timeout=180
-                        )
+                        response = await asyncio.to_thread(requests.post, UPLOAD_URL, data=data, files=files, timeout=180)
                         response.raise_for_status()
                         print(f"⬆️ חלק {part_index+1}/{total_parts} הועלה:", response.text)
                         break
@@ -144,7 +139,7 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-        # ✅ בקשת סיום חייבת להיות כאן ולאחר סיום כל החלקים
+        # 🔹 בקשת סיום (שימו לב ל־`await`)
         data = {
             "token": YMOT_TOKEN,
             "path": YMOT_PATH,
@@ -153,10 +148,11 @@ def upload_to_ymot(file_path):
             "qquuid": qquuid,
             "qqfilename": filename,
             "qqtotalfilesize": file_size,
-            "qqtotalparts": total_parts - 1  # ⚠️ קריטי
+            "qqtotalparts": total_parts - 1
         }
+
         try:
-            response = requests.post(UPLOAD_URL + "?done", data=data, timeout=180)
+            response = await asyncio.to_thread(requests.post, UPLOAD_URL + "?done", data=data, timeout=180)
             response.raise_for_status()
             print("✅ סיום העלאה:", response.text)
         except Exception as e:
