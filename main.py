@@ -148,19 +148,19 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-        # 🔹 בקשת סיום
-        data = {
-            "token": YMOT_TOKEN,
-            "path": YMOT_PATH,
-            "convertAudio": "1",
-            "autoNumbering": "true",
-            "qquuid": qquuid,
-            "qqfilename": filename,
-            "qqtotalfilesize": file_size,
-            "qqtotalparts": total_parts
-        }
-        response = requests.post(UPLOAD_URL + "?done", data=data)
-        print("✅ סיום העלאה:", response.text)
+# 🔹 בקשת סיום
+data = {
+    "token": YMOT_TOKEN,
+    "path": YMOT_PATH,
+    "convertAudio": "1",      # חובה שיהיה
+    "autoNumbering": "true",  # חובה שיהיה מחרוזת
+    "qquuid": qquuid,
+    "qqfilename": filename,
+    "qqtotalfilesize": file_size,
+    "qqtotalparts": total_parts - 1   # ← כאן השינוי הקריטי
+}
+response = requests.post(UPLOAD_URL + "?done", data=data)
+print("✅ סיום העלאה:", response.text)
 
 
 # 🟡 UserBot
