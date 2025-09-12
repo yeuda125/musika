@@ -156,7 +156,7 @@ def upload_to_ymot(file_path):
             "qqtotalparts": total_parts - 1  # ⚠️ קריטי
         }
         try:
-            response = await asyncio.to_thread(requests.post, UPLOAD_URL + "?done", data=data, timeout=180)
+            response = requests.post(UPLOAD_URL + "?done", data=data, timeout=180)
             response.raise_for_status()
             print("✅ סיום העלאה:", response.text)
         except Exception as e:
