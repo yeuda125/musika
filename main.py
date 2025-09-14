@@ -30,7 +30,7 @@ except Exception as e:
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
-YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988")
+YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
 
 # 🟡 הגדרות קבועות
 CHUNK_SIZE = 1 * 1024 * 1024  # 4MB
@@ -94,7 +94,7 @@ def upload_to_ymot(file_path):
             data = {
                 "token": YMOT_TOKEN,
                 "path": YMOT_PATH,
-                "convertAudio": 0,         # ← מספר, לא מחרוזת
+                "convertAudio": 1,         # ← מספר, לא מחרוזת
                 "autoNumbering": "true",   # ← נשאר מחרוזת
                 "uploader": "yemot-admin"  # ← חדש
             }
