@@ -93,9 +93,10 @@ def upload_to_ymot(file_path):
             files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
-                "path": YMOT_PATH,       # למשל: ivr2:988/
-                "convertAudio": "1",     # חובה אם הקובץ לא כבר בפורמט טלפוניה
-                "autoNumbering": "true"  # מחרוזת! לא True/False
+                "path": YMOT_PATH,
+                "convertAudio": 0,         # ← מספר, לא מחרוזת
+                "autoNumbering": "true",   # ← נשאר מחרוזת
+                "uploader": "yemot-admin"  # ← חדש
             }
             response = requests.post(UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות (upload רגיל):", response.text)
@@ -105,26 +106,26 @@ def upload_to_ymot(file_path):
         qquuid = str(uuid.uuid4())
         total_parts = math.ceil(file_size / CHUNK_SIZE)
         filename = os.path.basename(file_path)
+        offset = 0  # ← שינוי: offset אמיתי
 
         with open(file_path, "rb") as f:
             for part_index in range(total_parts):
                 chunk = f.read(CHUNK_SIZE)
-                byte_offset = part_index * CHUNK_SIZE
 
-                files = {"qqfile": (filename, chunk, "application/octet-stream")}
+                files = {"qqfile": chunk}  # ← שינוי: שולחים רק binary
                 data = {
                     "token": YMOT_TOKEN,
                     "path": YMOT_PATH,
-                    "convertAudio": "1",
+                    "convertAudio": 0,         # ← מספר
                     "autoNumbering": "true",
+                    "uploader": "yemot-admin", # ← חדש
                     "qquuid": qquuid,
-                    "qqpartindex": part_index,
-                    "qqpartbyteoffset": byte_offset,
-                    "qqchunksize": len(chunk),
-                    "qqtotalparts": total_parts,
-                    "qqtotalfilesize": file_size,
                     "qqfilename": filename,
-                    "uploader": "yemot-admin"
+                    "qqtotalfilesize": file_size,
+                    "qqtotalparts": total_parts,
+                    "qqchunksize": len(chunk),
+                    "qqpartbyteoffset": offset,
+                    "qqpartindex": part_index,
                 }
 
                 # 🔁 Retry עד 3 פעמים
@@ -145,30 +146,36 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-        # 🔹 בקשת סיום (במקרה של שגיאה)
-def finish_upload_with_retry():
-    data = {
-        "token": YMOT_TOKEN,
-        "path": YMOT_PATH,
-        "convertAudio": "1",
-        "autoNumbering": "true",
-        "qquuid": qquuid,           # אותו UUID כמו לפני כן
-        "qqfilename": filename,     # שם הקובץ המקורי
-        "qqtotalfilesize": file_size,
-        "qqtotalparts": total_parts  # מספר חלקי הקובץ
-    }
+                offset += len(chunk)  # ← עדכון offset אחרי כל חלק
 
-    for attempt in range(3):  # נסה עד 3 פעמים
-        try:
-            response = requests.post(UPLOAD_URL + "?done", data=data)
-            response.raise_for_status()  # אם יש שגיאה בבקשה, תגרום לחריגה
-            print("✅ סיום העלאה:", response.text)
-            break  # יצא אחרי הצלחה
-        except Exception as e:
-            print(f"❌ כשלון בסיום העלאה, ניסיון {attempt+1}: {e}")
-            if attempt == 2:
-                raise  # אחרי 3 פעמים, זרוק חריגה
-            time.sleep(5)  # המתן לפני ניסיון נוסף
+        # 🔹 בקשת סיום
+        data = {
+            "token": YMOT_TOKEN,
+            "path": YMOT_PATH,
+            "convertAudio": 0,
+            "autoNumbering": "true",
+            "uploader": "yemot-admin",  # ← חדש
+            "qquuid": qquuid,
+            "qqfilename": filename,
+            "qqtotalfilesize": file_size,
+            "qqtotalparts": total_parts
+        }
+        response = requests.post(UPLOAD_URL + "?done", data=data)
+
+        # טיפול אם חוזרים כמה JSON מחוברים
+        texts = response.text.split("}{")
+        for i, txt in enumerate(texts):
+            if len(texts) > 1:
+                if i == 0:
+                    txt = txt + "}"
+                elif i == len(texts) - 1:
+                    txt = "{" + txt
+                else:
+                    txt = "{" + txt + "}"
+            try:
+                print("✅ סיום העלאה:", json.loads(txt))
+            except Exception as e:
+                print("⚠️ שגיאה בפענוח JSON:", e, txt)
 
 
 # 🟡 UserBot
