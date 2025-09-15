@@ -193,7 +193,7 @@ def upload_to_ymot(file_path):
 
 
 # 🟡 UserBot
-app = Client("my_account", api_id=API_ID, api_hash=API_HASH, reconnect=True)
+app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
 
 
 @app.on_message(filters.chat(-1002710964688))
