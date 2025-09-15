@@ -42,6 +42,20 @@ def clean_text(text):
         "חדשות המוקד • בטלגרם: t.me/hamoked_il",
         "בוואטסאפ: https://chat.whatsapp.com/LoxVwdYOKOAH2y2kaO8GQ7",
         "לעדכוני הפרגוד בטלגרם",
+        "ידיעות בני ברק",
+        "לכל העדכונים",
+        "לשיתוף",
+        "בWhatsApp",
+        "מה שמעניין",
+        "בוואטסאפ",
+        "ובטלגרם",
+        "צאפ מגזין",
+        "מה שמעניין בוואטצאפ",
+        "מצטרפים בקישור",
+        "לכל העדכונים, ולכתבות נוספות הצטרפו לערוץ דרך הקישור",
+        "להצטרפות מלאה לקבוצה לחצו על הצטרף",
+        "תאריך שידור",
+        "לעדכוני הפרגוד בטלגרם",
     ], key=len, reverse=True)
 
     for phrase in BLOCKED_PHRASES:
@@ -179,44 +193,64 @@ def upload_to_ymot(file_path):
 
 
 # 🟡 UserBot
-app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
+app = Client("my_account", api_id=API_ID, api_hash=API_HASH, reconnect=True)
 
 
 @app.on_message(filters.chat(-1002710964688))
 async def handle_message(client, message):
     text = message.text or message.caption
     has_video = message.video is not None
-    has_audio = message.voice or message.audio
+    has_voice = message.voice is not None
+    has_audio = message.audio is not None
 
+    # 🎥 וידאו
     if has_video:
-        video_file = await message.download()  # מחזיר את הנתיב המלא
+        video_file = await message.download(file_name="video.mp4")
         wav_file = "video.wav"
         convert_to_wav(video_file, wav_file)
         upload_to_ymot(wav_file)
         os.remove(video_file)
         os.remove(wav_file)
 
+    # 🎤 קול (voice)
+    if has_voice:
+        voice_file = await message.download(file_name="voice.ogg")
+        wav_file = "voice.wav"
+        convert_to_wav(voice_file, wav_file)
+        upload_to_ymot(wav_file)
+        os.remove(voice_file)
+        os.remove(wav_file)
+
+    # 🎵 אודיו רגיל (audio)
     if has_audio:
-        audio_file = await (message.voice or message.audio).download()
+        audio_file = await message.download(file_name=message.audio.file_name or "audio.mp3")
         wav_file = "audio.wav"
         convert_to_wav(audio_file, wav_file)
         upload_to_ymot(wav_file)
         os.remove(audio_file)
         os.remove(wav_file)
 
+    # 📝 טקסט
     if text:
-        cleaned_for_tts = re.sub(r"[^א-ת\s.,!?()\u0590-\u05FF]", "", text)
+        cleaned_for_tts = re.sub(r"[^0-9א-ת\s.,!?()\u0590-\u05FF]", "", text)
         cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
-        full_text = create_full_text(cleaned_for_tts)
-        text_to_mp3(full_text, "output.mp3")
-        convert_to_wav("output.mp3", "output.wav")
-        upload_to_ymot("output.wav")
-        os.remove("output.mp3")
-        os.remove("output.wav")
+        if cleaned_for_tts:  # שלא ינסה על טקסט ריק
+            full_text = create_full_text(cleaned_for_tts)
+            text_to_mp3(full_text, "output.mp3")
+            convert_to_wav("output.mp3", "output.wav")
+            upload_to_ymot("output.wav")
+            os.remove("output.mp3")
+            os.remove("output.wav")
 
 from keep_alive import keep_alive
 keep_alive()
 
 print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה 🎧")
-app.run()
+
+while True:
+    try:
+        app.run()
+    except Exception as e:
+        print("❌ הבוט נפל:", e)
+        time.sleep(20)  # מחכה 10 שניות לפני ניסיון חיבור מחדש
