@@ -43,6 +43,8 @@ def clean_text(text):
         "בוואטסאפ: https://chat.whatsapp.com/LoxVwdYOKOAH2y2kaO8GQ7",
         "לעדכוני הפרגוד בטלגרם",
         "ידיעות בני ברק",
+        "לכל העדכונים, ולכתבות נוספות הצטרפו לערוץ דרך הקישור",
+        "להצטרפות מלאה לקבוצה לחצו על הצטרף",
         "לכל העדכונים",
         "לשיתוף",
         "בWhatsApp",
@@ -238,7 +240,7 @@ async def handle_message(client, message):
     # 📝 טקסט
     if text:
         cleaned_text = clean_text(text)
-        cleaned_for_tts = re.sub(r"[^0-9א-ת\s.,!?()\u0590-\u05FF]", "", cleaned_text)
+        cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
         cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
         if cleaned_for_tts:
