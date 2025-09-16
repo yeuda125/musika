@@ -33,7 +33,7 @@ YMOT_TOKEN = os.getenv("YMOT_TOKEN")
 YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
 
 # 🟡 הגדרות קבועות
-CHUNK_SIZE = 1 * 1024 * 1024  # 4MB
+CHUNK_SIZE = 1 * 1024 * 1024  # 1MB
 UPLOAD_URL = "https://call2all.co.il/ym/api/UploadFile"
 
 
@@ -115,9 +115,9 @@ def upload_to_ymot(file_path):
             data = {
                 "token": YMOT_TOKEN,
                 "path": YMOT_PATH,
-                "convertAudio": 1,         # ← מספר, לא מחרוזת
-                "autoNumbering": "true",   # ← נשאר מחרוזת
-                "uploader": "yemot-admin"  # ← חדש
+                "convertAudio": 1,
+                "autoNumbering": "true",
+                "uploader": "yemot-admin"
             }
             response = requests.post(UPLOAD_URL, data=data, files=files)
         print("📞 תגובת ימות (upload רגיל):", response.text)
@@ -127,19 +127,19 @@ def upload_to_ymot(file_path):
         qquuid = str(uuid.uuid4())
         total_parts = math.ceil(file_size / CHUNK_SIZE)
         filename = os.path.basename(file_path)
-        offset = 0  # ← שינוי: offset אמיתי
+        offset = 0
 
         with open(file_path, "rb") as f:
             for part_index in range(total_parts):
                 chunk = f.read(CHUNK_SIZE)
 
-                files = {"qqfile": chunk}  # ← שינוי: שולחים רק binary
+                files = {"qqfile": chunk}
                 data = {
                     "token": YMOT_TOKEN,
                     "path": YMOT_PATH,
-                    "convertAudio": 0,         # ← מספר
+                    "convertAudio": 0,
                     "autoNumbering": "true",
-                    "uploader": "yemot-admin", # ← חדש
+                    "uploader": "yemot-admin",
                     "qquuid": qquuid,
                     "qqfilename": filename,
                     "qqtotalfilesize": file_size,
@@ -149,7 +149,6 @@ def upload_to_ymot(file_path):
                     "qqpartindex": part_index,
                 }
 
-                # 🔁 Retry עד 3 פעמים
                 for attempt in range(3):
                     try:
                         response = requests.post(
@@ -167,7 +166,7 @@ def upload_to_ymot(file_path):
                             raise
                         time.sleep(5)
 
-                offset += len(chunk)  # ← עדכון offset אחרי כל חלק
+                offset += len(chunk)
 
         # 🔹 בקשת סיום
         data = {
@@ -175,7 +174,7 @@ def upload_to_ymot(file_path):
             "path": YMOT_PATH,
             "convertAudio": 0,
             "autoNumbering": "true",
-            "uploader": "yemot-admin",  # ← חדש
+            "uploader": "yemot-admin",
             "qquuid": qquuid,
             "qqfilename": filename,
             "qqtotalfilesize": file_size,
@@ -183,7 +182,6 @@ def upload_to_ymot(file_path):
         }
         response = requests.post(UPLOAD_URL + "?done", data=data)
 
-        # טיפול אם חוזרים כמה JSON מחוברים
         texts = response.text.split("}{")
         for i, txt in enumerate(texts):
             if len(texts) > 1:
@@ -239,17 +237,18 @@ async def handle_message(client, message):
 
     # 📝 טקסט
     if text:
-        cleaned_text = clean_text(text)  # ✅ קודם מסיר מילים אסורות וקישורים
+        cleaned_text = clean_text(text)
         cleaned_for_tts = re.sub(r"[^0-9א-ת\s.,!?()\u0590-\u05FF]", "", cleaned_text)
         cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
-        if cleaned_for_tts:  # שלא ינסה על טקסט ריק
+        if cleaned_for_tts:
             full_text = create_full_text(cleaned_for_tts)
             text_to_mp3(full_text, "output.mp3")
             convert_to_wav("output.mp3", "output.wav")
             upload_to_ymot("output.wav")
             os.remove("output.mp3")
             os.remove("output.wav")
+
 
 from keep_alive import keep_alive
 keep_alive()
@@ -261,4 +260,4 @@ while True:
         app.run()
     except Exception as e:
         print("❌ הבוט נפל:", e)
-        time.sleep(20)  # מחכה 10 שניות לפני ניסיון חיבור מחדש
+        time.sleep(20)
