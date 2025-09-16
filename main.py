@@ -238,18 +238,18 @@ async def handle_message(client, message):
         os.remove(wav_file)
 
     # 📝 טקסט
-   if text:
+    if text:
         cleaned_text = clean_text(text)  # ✅ קודם מסיר מילים אסורות וקישורים
         cleaned_for_tts = re.sub(r"[^0-9א-ת\s.,!?()\u0590-\u05FF]", "", cleaned_text)
         cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
-    if cleaned_for_tts:  # שלא ינסה על טקסט ריק
-        full_text = create_full_text(cleaned_for_tts)
-        text_to_mp3(full_text, "output.mp3")
-        convert_to_wav("output.mp3", "output.wav")
-        upload_to_ymot("output.wav")
-        os.remove("output.mp3")
-        os.remove("output.wav")
+        if cleaned_for_tts:  # שלא ינסה על טקסט ריק
+            full_text = create_full_text(cleaned_for_tts)
+            text_to_mp3(full_text, "output.mp3")
+            convert_to_wav("output.mp3", "output.wav")
+            upload_to_ymot("output.wav")
+            os.remove("output.mp3")
+            os.remove("output.wav")
 
 from keep_alive import keep_alive
 keep_alive()
