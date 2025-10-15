@@ -210,14 +210,47 @@ async def handle_message(client, message):
     has_voice = message.voice is not None
     has_audio = message.audio is not None
 
-    # 🎥 וידאו
+    # 🎥 וידאו עם או בלי טקסט
     if has_video:
         video_file = await message.download(file_name="video.mp4")
-        wav_file = "video.wav"
-        convert_to_wav(video_file, wav_file)
-        upload_to_ymot(wav_file)
+        wav_video = "video.wav"
+        convert_to_wav(video_file, wav_video)
+
+        if text:
+            # 🧼 ניקוי טקסט
+            cleaned_text = clean_text(text)
+            cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
+            cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
+
+            if cleaned_for_tts:
+                # 🗣️ יצירת TTS
+                full_text = create_full_text(cleaned_for_tts)
+                text_to_mp3(full_text, "tts.mp3")
+                convert_to_wav("tts.mp3", "tts.wav")
+
+                # 🧩 חיבור tts.wav + video.wav => final.wav
+                with open("tts.wav", "rb") as f1, open("video.wav", "rb") as f2:
+                    data1 = f1.read()
+                    data2 = f2.read()
+
+                with open("final.wav", "wb") as out:
+                    out.write(data1[:44])                # header מה־tts
+                    out.write(data1[44:] + data2[44:])   # שילוב נתונים
+
+                upload_to_ymot("final.wav")
+
+                os.remove("tts.mp3")
+                os.remove("tts.wav")
+                os.remove("final.wav")
+            else:
+                upload_to_ymot(wav_video)
+        else:
+            upload_to_ymot(wav_video)
+
         os.remove(video_file)
-        os.remove(wav_file)
+        os.remove(wav_video)
+
+        return  # חשוב! כדי לא להמשיך לטפל שוב בטקסט למטה
 
     # 🎤 קול (voice)
     if has_voice:
@@ -227,6 +260,7 @@ async def handle_message(client, message):
         upload_to_ymot(wav_file)
         os.remove(voice_file)
         os.remove(wav_file)
+        return
 
     # 🎵 אודיו רגיל (audio)
     if has_audio:
@@ -236,8 +270,9 @@ async def handle_message(client, message):
         upload_to_ymot(wav_file)
         os.remove(audio_file)
         os.remove(wav_file)
+        return
 
-    # 📝 טקסט
+    # 📝 טקסט בלבד (אם אין שום מדיה)
     if text:
         cleaned_text = clean_text(text)
         cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
@@ -250,7 +285,6 @@ async def handle_message(client, message):
             upload_to_ymot("output.wav")
             os.remove("output.mp3")
             os.remove("output.wav")
-
 
 from keep_alive import keep_alive
 keep_alive()
