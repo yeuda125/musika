@@ -212,9 +212,12 @@ async def handle_message(client, message):
 
     # 🎥 וידאו עם או בלי טקסט
     if has_video:
+        print("📥 התקבל וידאו - מוריד וממיר לאודיו")
         video_file = await message.download(file_name="video.mp4")
         wav_video = "video.wav"
         convert_to_wav(video_file, wav_video)
+
+        final_file = wav_video  # ברירת מחדל - נעלה את זה אם אין טקסט
 
         if text:
             # 🧼 ניקוי טקסט
@@ -223,34 +226,38 @@ async def handle_message(client, message):
             cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
             if cleaned_for_tts:
-                # 🗣️ יצירת TTS
+                print("🗣️ ממיר טקסט ל-TTS")
+                # יצירת TTS
                 full_text = create_full_text(cleaned_for_tts)
                 text_to_mp3(full_text, "tts.mp3")
                 convert_to_wav("tts.mp3", "tts.wav")
 
                 # 🧩 חיבור tts.wav + video.wav => final.wav
+                print("🔗 מחבר TTS עם אודיו של הוידאו")
                 with open("tts.wav", "rb") as f1, open("video.wav", "rb") as f2:
                     data1 = f1.read()
                     data2 = f2.read()
 
                 with open("final.wav", "wb") as out:
-                    out.write(data1[:44])                # header מה־tts
-                    out.write(data1[44:] + data2[44:])   # שילוב נתונים
+                    out.write(data1[:44])                # header מ־tts
+                    out.write(data1[44:] + data2[44:])   # הנתונים עצמם
 
-                upload_to_ymot("final.wav")
+                final_file = "final.wav"
 
+                # מחיקת קבצים זמניים
                 os.remove("tts.mp3")
                 os.remove("tts.wav")
-                os.remove("final.wav")
-            else:
-                upload_to_ymot(wav_video)
-        else:
-            upload_to_ymot(wav_video)
 
+        # 💾 העלאה לימות (הקובץ שנבחר - עם או בלי TTS)
+        upload_to_ymot(final_file)
+
+        # ניקיון
         os.remove(video_file)
         os.remove(wav_video)
+        if final_file == "final.wav":
+            os.remove("final.wav")
 
-        return  # חשוב! כדי לא להמשיך לטפל שוב בטקסט למטה
+        return  # לא להמשיך לטפל בטקסט שוב
 
     # 🎤 קול (voice)
     if has_voice:
