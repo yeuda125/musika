@@ -34,7 +34,8 @@ YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
 
 # 🟡 הגדרות קבועות
 CHUNK_SIZE = 1 * 1024 * 1024  # 1MB
-UPLOAD_URL = "https://call2all.coil/ym/api/UploadFile"
+# ✅ תיקון: הוספנו נקודה בין co ל-il
+UPLOAD_URL = "https://call2all.co.il/ym/api/UploadFile"
 
 
 def clean_text(text):
