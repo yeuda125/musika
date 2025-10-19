@@ -105,11 +105,14 @@ def text_to_mp3(text, filename="output.mp3"):
 
 
 def convert_to_wav(input_file, output_file="output.wav"):
-    # ... (פונקציית המרה ל־WAV בפורמט ימות) ...
+    """
+    פונקציית המרה ל־WAV בפורמט ימות (8000Hz, מונו).
+    הוספת check=True לוודא שההמרה מצליחה.
+    """
     subprocess.run([
         "ffmpeg", "-i", input_file, "-ar", "8000", "-ac", "1", "-f", "wav",
         output_file, "-y"
-    ])
+    ], check=True) # 🔑 הוספת check=True
 
 
 def concat_wav_files(file1, file2, output_file="merged.wav"):
@@ -254,6 +257,12 @@ app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
 
 @app.on_message(filters.chat(-1002710964688))
 async def handle_message(client, message):
+    
+    # 🛑 תיקון 2: התעלמות מהודעות תגובה כדי למנוע KeyError ב-Pyrogram
+    if message.reply_to_message:
+        print("⏭️ מדלג על הודעה: זוהי תגובה להודעה אחרת.")
+        return
+
     text = message.text or message.caption
     has_video = message.video is not None
     has_voice = message.voice is not None
@@ -274,6 +283,7 @@ async def handle_message(client, message):
 
         try:
             # 1. הורדת הווידאו והמרתו ל־WAV
+            # הפונקציה convert_to_wav מעכשיו עם check=True - תיקון 1
             await message.download(file_name=VIDEO_FILE)
             convert_to_wav(VIDEO_FILE, VIDEO_WAV)
 
