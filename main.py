@@ -269,6 +269,7 @@ async def handle_message(client, message):
     has_audio = message.audio is not None
 
     # הגדרת שמות קבצים זמניים
+    # רק משתמשים בשמות האלו לקבצי הפלט, הקבצים המורדים יקבלו את הנתיב שהפונקציה download מחזירה
     VIDEO_FILE = "video.mp4"
     VIDEO_WAV = "video.wav"
     TTS_MP3 = "text.mp3"
@@ -277,15 +278,19 @@ async def handle_message(client, message):
     OUTPUT_MP3 = "output.mp3"
     OUTPUT_WAV = "output.wav"
 
+    # נתיב הורדה בפועל, נשמר כדי שנוכל למחוק אותו אחר כך.
+    downloaded_video_path = None
+    downloaded_audio_path = None
+
     # 1. 🎥 וידאו עם טקסט (משולב) - מטופל ראשון
     if has_video and text:
         print("▶️ מטפל בווידאו וטקסט משולב...")
 
         try:
             # 1. הורדת הווידאו והמרתו ל־WAV
-            # הפונקציה convert_to_wav מעכשיו עם check=True - תיקון 1
-            await message.download(file_name=VIDEO_FILE)
-            convert_to_wav(VIDEO_FILE, VIDEO_WAV)
+            # 🔑 תיקון 1: לכידת הנתיב המדויק שהוחזר מהורדה
+            downloaded_video_path = await message.download(file_name=VIDEO_FILE)
+            convert_to_wav(downloaded_video_path, VIDEO_WAV)
 
             # 2. עיבוד הטקסט והמרתו ל־WAV (TTS)
             cleaned_text = clean_text(text)
@@ -314,8 +319,11 @@ async def handle_message(client, message):
             print(f"❌ שגיאה בטיפול בווידאו וטקסט משולב: {e}")
 
         finally:
-            # ניקוי כל הקבצים הזמניים
-            maybe_remove_files(VIDEO_FILE, VIDEO_WAV, TTS_MP3, TTS_WAV, FINAL_WAV)
+            # ניקוי כל הקבצים הזמניים, כולל הנתיב המדויק שהורד
+            cleanup_files = [VIDEO_WAV, TTS_MP3, TTS_WAV, FINAL_WAV]
+            if downloaded_video_path:
+                cleanup_files.append(downloaded_video_path)
+            maybe_remove_files(*cleanup_files)
         
         return # יציאה מהפונקציה כדי למנוע כפילויות
 
@@ -323,44 +331,56 @@ async def handle_message(client, message):
     if has_video:
         print("▶️ מטפל בווידאו בלבד...")
         try:
-            video_file = await message.download(file_name=VIDEO_FILE)
+            # 🔑 תיקון 1: לכידת הנתיב המדויק שהוחזר מהורדה
+            downloaded_video_path = await message.download(file_name=VIDEO_FILE)
             wav_file = VIDEO_WAV
-            convert_to_wav(video_file, wav_file)
+            convert_to_wav(downloaded_video_path, wav_file)
             upload_to_ymot(wav_file)
             print("✅ וידאו בלבד הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בווידאו בלבד: {e}")
         finally:
-            maybe_remove_files(VIDEO_FILE, VIDEO_WAV)
+            cleanup_files = [VIDEO_WAV]
+            if downloaded_video_path:
+                cleanup_files.append(downloaded_video_path)
+            maybe_remove_files(*cleanup_files)
 
 
     # 3. 🎤 קול (voice)
     if has_voice:
         print("▶️ מטפל בהודעת קול...")
         try:
-            voice_file = await message.download(file_name="voice.ogg")
+            # 🔑 נתיב הורדה בפועל
+            downloaded_audio_path = await message.download(file_name="voice.ogg")
             wav_file = OUTPUT_WAV
-            convert_to_wav(voice_file, wav_file)
+            convert_to_wav(downloaded_audio_path, wav_file)
             upload_to_ymot(wav_file)
             print("✅ קול הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בהודעת קול: {e}")
         finally:
-            maybe_remove_files("voice.ogg", OUTPUT_WAV)
+            cleanup_files = [OUTPUT_WAV]
+            if downloaded_audio_path:
+                cleanup_files.append(downloaded_audio_path)
+            maybe_remove_files(*cleanup_files)
 
     # 4. 🎵 אודיו רגיל (audio)
     if has_audio:
         print("▶️ מטפל בקובץ אודיו...")
         try:
-            audio_file = await message.download(file_name=message.audio.file_name or "audio.mp3")
+            # 🔑 נתיב הורדה בפועל
+            downloaded_audio_path = await message.download(file_name=message.audio.file_name or "audio.mp3")
             wav_file = OUTPUT_WAV
-            convert_to_wav(audio_file, wav_file)
+            convert_to_wav(downloaded_audio_path, wav_file)
             upload_to_ymot(wav_file)
             print("✅ אודיו הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בקובץ אודיו: {e}")
         finally:
-            maybe_remove_files(audio_file, OUTPUT_WAV)
+            cleanup_files = [OUTPUT_WAV]
+            if downloaded_audio_path:
+                cleanup_files.append(downloaded_audio_path)
+            maybe_remove_files(*cleanup_files)
 
     # 5. 📝 טקסט בלבד
     if text:
