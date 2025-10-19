@@ -1,3 +1,4 @@
+יש לי קוד כזה
 import os
 import json
 import subprocess
@@ -210,50 +211,46 @@ async def handle_message(client, message):
     has_voice = message.voice is not None
     has_audio = message.audio is not None
 
-    # 🎥 וידאו עם טקסט
-    if has_video and text:
-        video_file = await message.video.get_file()
-        await video_file.download_to_drive("video.mp4")
-        convert_to_wav("video.mp4", "video.wav")
-        cleaned = clean_text(text)
-        full_text = create_full_text(cleaned)
-        text_to_mp3(full_text, "text.mp3")
-        convert_to_wav("text.mp3", "text.wav")
-        concat_wav_files("text.wav", "video.wav", "final.wav")
-        upload_to_ymot("final.wav")
+    # 🎥 וידאו
+    if has_video:
+        video_file = await message.download(file_name="video.mp4")
+        wav_file = "video.wav"
+        convert_to_wav(video_file, wav_file)
+        upload_to_ymot(wav_file)
+        os.remove(video_file)
+        os.remove(wav_file)
 
-        for f in ["video.mp4", "video.wav", "text.mp3", "text.wav", "final.wav"]:
-            if os.path.exists(f): os.remove(f)
-        return
+    # 🎤 קול (voice)
+    if has_voice:
+        voice_file = await message.download(file_name="voice.ogg")
+        wav_file = "voice.wav"
+        convert_to_wav(voice_file, wav_file)
+        upload_to_ymot(wav_file)
+        os.remove(voice_file)
+        os.remove(wav_file)
 
-    if has_video:
-        video_file = await message.video.get_file()
-        await video_file.download_to_drive("video.mp4")
-        convert_to_wav("video.mp4", "video.wav")
-        upload_to_ymot("video.wav")
+    # 🎵 אודיו רגיל (audio)
+    if has_audio:
+        audio_file = await message.download(file_name=message.audio.file_name or "audio.mp3")
+        wav_file = "audio.wav"
+        convert_to_wav(audio_file, wav_file)
+        upload_to_ymot(wav_file)
+        os.remove(audio_file)
+        os.remove(wav_file)
 
-        os.remove("video.mp4")
-        os.remove("video.wav")
+    # 📝 טקסט
+    if text:
+        cleaned_text = clean_text(text)
+        cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
+        cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
-    if has_audio:
-        audio_file = await (message.audio or message.voice).get_file()
-        await audio_file.download_to_drive("audio.ogg")
-        convert_to_wav("audio.ogg", "audio.wav")
-        upload_to_ymot("audio.wav")
-
-
-        os.remove("audio.ogg")
-        os.remove("audio.wav")
-
-    if text:
-        cleaned = clean_text(text)
-        full_text = create_full_text(cleaned)
-        text_to_mp3(full_text, "output.mp3")
-        convert_to_wav("output.mp3", "output.wav")
-        upload_to_ymot("output.wav")
-
-        os.remove("output.mp3")
-        os.remove("output.wav"
+        if cleaned_for_tts:
+            full_text = create_full_text(cleaned_for_tts)
+            text_to_mp3(full_text, "output.mp3")
+            convert_to_wav("output.mp3", "output.wav")
+            upload_to_ymot("output.wav")
+            os.remove("output.mp3")
+            os.remove("output.wav")
 
 
 from keep_alive import keep_alive
@@ -268,3 +265,59 @@ while True:
         print("❌ הבוט נפל:", e)
         time.sleep(20)
 
+אני רוצה שכאשר אני מעלה הודעה בטלגרם של וידאו ויש גם טקסט בהודעה, כעת הוא מעלה את הוידאו ואחר כך קובץ של הטקסט, אני רוצה שהוא יאחד את הטקסט והוידאו לקובץ אחד, שקודם שומעים את הטקסט ואחר כך את הוידאו.
+
+אל תשנה את הקוד עדיין. אני רוצה להעתיק לך קוד אחר שעושה את זה כדי שתראה איך לעשות את זה.
+הקוד שעושה את זה הוא
+    # 🎥 וידאו עם טקסט
+    if has_video and text:
+        video_file = await message.video.get_file()
+        await video_file.download_to_drive("video.mp4")
+        convert_to_wav("video.mp4", "video.wav")
+        cleaned = clean_text(text)
+        full_text = create_full_text(cleaned)
+        text_to_mp3(full_text, "text.mp3")
+        convert_to_wav("text.mp3", "text.wav")
+        concat_wav_files("text.wav", "video.wav", "final.wav")
+        upload_to_ymot("final.wav")
+
+        # ✅ לוגיקת צינתוק חכמה
+        maybe_send_tzintuk()
+
+        for f in ["video.mp4", "video.wav", "text.mp3", "text.wav", "final.wav"]:
+            if os.path.exists(f): os.remove(f)
+        return
+
+    if has_video:
+        video_file = await message.video.get_file()
+        await video_file.download_to_drive("video.mp4")
+        convert_to_wav("video.mp4", "video.wav")
+        upload_to_ymot("video.wav")
+
+        maybe_send_tzintuk()    
+
+        os.remove("video.mp4")
+        os.remove("video.wav")
+
+    if has_audio:
+        audio_file = await (message.audio or message.voice).get_file()
+        await audio_file.download_to_drive("audio.ogg")
+        convert_to_wav("audio.ogg", "audio.wav")
+        upload_to_ymot("audio.wav")
+
+        maybe_send_tzintuk()    
+
+        os.remove("audio.ogg")
+        os.remove("audio.wav")
+
+    if text:
+        cleaned = clean_text(text)
+        full_text = create_full_text(cleaned)
+        text_to_mp3(full_text, "output.mp3")
+        convert_to_wav("output.mp3", "output.wav")
+        upload_to_ymot("output.wav")
+
+        maybe_send_tzintuk()        
+
+        os.remove("output.mp3")
+        os.remove("output.wav"
