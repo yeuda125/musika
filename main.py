@@ -30,18 +30,19 @@ except Exception as e:
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
-DEFAULT_YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/") # נתיב ברירת מחדל אם הערוץ לא מזוהה
+# נתיב ברירת מחדל (נשאר כמשתנה סביבה אך לא בשימוש כ-Fallback בקוד הזה לאור הבקשה)
+DEFAULT_YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
 
 # ---------------------------------------------------------
-# ⚙️ הגדרות ניתוב ערוצים (השינוי שביקשת)
-# כאן מגדירים לאיזו שלוחה תלך ההודעה לפי ה-ID של הערוץ
+# ⚙️ הגדרות ניתוב ערוצים
+# רק ערוצים שמופיעים כאן יטופלו. הבוט יתעלם מכל השאר.
 # ---------------------------------------------------------
 CHANNEL_SETTINGS = {
     # דוגמא: ID של ערוץ : נתיב בימות המשיח
     -1002710964688: "ivr2:/988/",  # ערוץ קיים (דוגמה מהקוד שלך)
-    -1003579694794: "ivr2:/22/",   # דוגמה לערוץ A
-    -1003562922585: "ivr2:/33/",   # דוגמה לערוץ B
-    # תוסיף כאן עוד ערוצים לפי הצורך
+    -1001234567890: "ivr2:/45/",   # דוגמה לערוץ A
+    -1009876543211: "ivr2:/33/",   # דוגמה לערוץ B
+    # חובה להוסיף כאן את כל הערוצים שאתה רוצה שהבוט יעבוד בהם
 }
 
 # 🟡 הגדרות קבועות
@@ -81,7 +82,6 @@ def clean_text(text):
     text = re.sub(r'www\.\S+', '', text)
 
     # 🛑 מחיקת תווים לא עבריים
-    # שינוי קטן: הוספת תווי ':' ו־'/' לניקוי, כי הם היו מופיעים כחלק מקישורים שנמחקו
     text = re.sub(r'[^\w\s.,!?()\u0590-\u05FF]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
@@ -89,13 +89,10 @@ def clean_text(text):
 
 
 def create_full_text(text):
-    # הפונקציה הזו כרגע מחזירה את הטקסט כמות שהוא,
-    # אך מיועדת להוספת תוספות כמו שעה או כותרת במידת הצורך
     return text
 
 
 def text_to_mp3(text, filename="output.mp3"):
-    # ... (פונקציית TTS) ...
     client = texttospeech.TextToSpeechClient()
     synthesis_input = texttospeech.SynthesisInput(text=text)
     voice = texttospeech.VoiceSelectionParams(
@@ -117,51 +114,35 @@ def text_to_mp3(text, filename="output.mp3"):
 
 
 def convert_to_wav(input_file, output_file="output.wav"):
-    """
-    פונקציית המרה ל־WAV בפורמט ימות (8000Hz, מונו).
-    הוספת check=True לוודא שההמרה מצליחה.
-    """
     subprocess.run([
         "ffmpeg", "-i", input_file, "-ar", "8000", "-ac", "1", "-f", "wav",
         output_file, "-y"
-    ], check=True) # 🔑 הוספת check=True
+    ], check=True)
 
 
 def concat_wav_files(file1, file2, output_file="merged.wav"):
-    """
-    🔗 מחבר שני קבצי WAV לקובץ פלט אחד, תוך המרה לפורמט 8000Hz מונו.
-    file1 יושמע ראשון, ואחריו file2.
-    """
     tmp1 = "tmp1_ymot.wav"
     tmp2 = "tmp2_ymot.wav"
     
-    # ודא ששני הקבצים מומרים לפורמט הנדרש (8000Hz, מונו)
-    # `-y` מחליף קבצים קיימים
     convert_to_wav(file1, tmp1)
     convert_to_wav(file2, tmp2)
 
-    # כתיבת קובץ רשימה ל־ffmpeg concat
     list_file = "list.txt"
     with open(list_file, "w", encoding="utf-8") as f:
         f.write(f"file '{tmp1}'\n")
         f.write(f"file '{tmp2}'\n")
 
-    # ביצוע החיבור
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", list_file, "-c", "copy", output_file
-    ], check=True) # check=True יוודא שגיאות
+    ], check=True)
 
-    # ניקוי קבצי עזר
     os.remove(tmp1)
     os.remove(tmp2)
     os.remove(list_file)
 
 
 def maybe_remove_files(*filenames):
-    """
-    פונקציית עזר למחיקת קבצים זמניים בבטחה.
-    """
     for f in filenames:
         if os.path.exists(f):
             try:
@@ -171,10 +152,6 @@ def maybe_remove_files(*filenames):
 
 
 def upload_to_ymot(file_path, target_path):
-    """
-    פונקציה להעלאת קבצים לימות המשיח.
-    קיבלה עדכון לקבל את 'target_path' כפרמטר כדי לתמוך בניתוב לפי ערוצים.
-    """
     print(f"📡 מעלה קובץ לשלוחה: {target_path}")
     file_size = os.path.getsize(file_path)
 
@@ -270,21 +247,24 @@ def upload_to_ymot(file_path, target_path):
 # 🟡 UserBot
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
 
-# שינוי: מאזין לכל הערוצים כדי שנוכל לסנן לפי ID בפנים, או שניתן להשאיר פילטר ספציפי
-# אם אתה רוצה להאזין לכל הערוצים שהבוט נמצא בהם, השתמש ב-filters.channel
 @app.on_message(filters.channel)
 async def handle_message(client, message):
     
-    # 🛑 תיקון 2: התעלמות מהודעות תגובה כדי למנוע KeyError ב-Pyrogram
+    # 🛑 בדיקה מקדימה: האם הערוץ ברשימה המותרת?
+    chat_id = message.chat.id
+    if chat_id not in CHANNEL_SETTINGS:
+        # אם ה-ID לא ברשימה - הבוט מתעלם לגמרי ויוצא מהפונקציה
+        print(f"🚫 הודעה מערוץ לא מוגדר ({chat_id}) - מתעלם.")
+        return
+
+    # אם הגענו לפה, הערוץ מוכר. שולף את השלוחה המתאימה
+    target_ymot_path = CHANNEL_SETTINGS[chat_id]
+    print(f"📩 התקבלה הודעה מערוץ: {chat_id} | מעביר לשלוחה: {target_ymot_path}")
+
+    # 🛑 התעלמות מהודעות תגובה
     if message.reply_to_message:
         print("⏭️ מדלג על הודעה: זוהי תגובה להודעה אחרת.")
         return
-
-    # --- לוגיקה חדשה: זיהוי ערוץ וקביעת שלוחה ---
-    chat_id = message.chat.id
-    target_ymot_path = CHANNEL_SETTINGS.get(chat_id, DEFAULT_YMOT_PATH)
-    print(f"📩 התקבלה הודעה מערוץ: {chat_id} | מעביר לשלוחה: {target_ymot_path}")
-    # ---------------------------------------------
 
     text = message.text or message.caption
     has_video = message.video is not None
@@ -292,7 +272,6 @@ async def handle_message(client, message):
     has_audio = message.audio is not None
 
     # הגדרת שמות קבצים זמניים
-    # רק משתמשים בשמות האלו לקבצי הפלט, הקבצים המורדים יקבלו את הנתיב שהפונקציה download מחזירה
     VIDEO_FILE = "video.mp4"
     VIDEO_WAV = "video.wav"
     TTS_MP3 = "text.mp3"
@@ -301,7 +280,7 @@ async def handle_message(client, message):
     OUTPUT_MP3 = "output.mp3"
     OUTPUT_WAV = "output.wav"
 
-    # נתיב הורדה בפועל, נשמר כדי שנוכל למחוק אותו אחר כך.
+    # נתיב הורדה בפועל
     downloaded_video_path = None
     downloaded_audio_path = None
 
@@ -311,13 +290,11 @@ async def handle_message(client, message):
 
         try:
             # 1. הורדת הווידאו והמרתו ל־WAV
-            # 🔑 תיקון 1: לכידת הנתיב המדויק שהוחזר מהורדה
             downloaded_video_path = await message.download(file_name=VIDEO_FILE)
             convert_to_wav(downloaded_video_path, VIDEO_WAV)
 
             # 2. עיבוד הטקסט והמרתו ל־WAV (TTS)
             cleaned_text = clean_text(text)
-            # ניקוי נוסף עבור TTS
             cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
             cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
@@ -326,19 +303,15 @@ async def handle_message(client, message):
                 text_to_mp3(full_text, TTS_MP3)
                 convert_to_wav(TTS_MP3, TTS_WAV)
 
-                # --- שינוי: ביטול החיבור והעלאה בנפרד ---
-                
-                # העלאת קובץ הטקסט (ההקראה)
+                # העלאה בנפרד (טקסט ואז וידאו)
                 print("⬆️ מעלה את קובץ הטקסט (TTS)...")
                 upload_to_ymot(TTS_WAV, target_ymot_path)
 
-                # העלאת קובץ האודיו של הוידאו
                 print("⬆️ מעלה את קובץ האודיו של הוידאו...")
                 upload_to_ymot(VIDEO_WAV, target_ymot_path)
                 
                 print("✅ וידאו וטקסט הועלו כשני קבצים נפרדים בהצלחה!")
             else:
-                # אם אין טקסט נקי, מטפל בזה רק כווידאו רגיל
                 print("⚠️ הטקסט נוקה לחלוטין (ריק). מעלה רק את הווידאו.")
                 upload_to_ymot(VIDEO_WAV, target_ymot_path)
                 print("✅ וידאו בלבד הועלה בהצלחה.")
@@ -347,19 +320,17 @@ async def handle_message(client, message):
             print(f"❌ שגיאה בטיפול בווידאו וטקסט משולב: {e}")
 
         finally:
-            # ניקוי כל הקבצים הזמניים, כולל הנתיב המדויק שהורד
             cleanup_files = [VIDEO_WAV, TTS_MP3, TTS_WAV, FINAL_WAV]
             if downloaded_video_path:
                 cleanup_files.append(downloaded_video_path)
             maybe_remove_files(*cleanup_files)
         
-        return # יציאה מהפונקציה כדי למנוע כפילויות
+        return # יציאה מהפונקציה
 
     # 2. 🎥 וידאו בלבד
     if has_video:
         print("▶️ מטפל בווידאו בלבד...")
         try:
-            # 🔑 תיקון 1: לכידת הנתיב המדויק שהוחזר מהורדה
             downloaded_video_path = await message.download(file_name=VIDEO_FILE)
             wav_file = VIDEO_WAV
             convert_to_wav(downloaded_video_path, wav_file)
@@ -378,7 +349,6 @@ async def handle_message(client, message):
     if has_voice:
         print("▶️ מטפל בהודעת קול...")
         try:
-            # 🔑 נתיב הורדה בפועל
             downloaded_audio_path = await message.download(file_name="voice.ogg")
             wav_file = OUTPUT_WAV
             convert_to_wav(downloaded_audio_path, wav_file)
@@ -396,7 +366,6 @@ async def handle_message(client, message):
     if has_audio:
         print("▶️ מטפל בקובץ אודיו...")
         try:
-            # 🔑 נתיב הורדה בפועל
             downloaded_audio_path = await message.download(file_name=message.audio.file_name or "audio.mp3")
             wav_file = OUTPUT_WAV
             convert_to_wav(downloaded_audio_path, wav_file)
