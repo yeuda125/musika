@@ -30,7 +30,19 @@ except Exception as e:
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 YMOT_TOKEN = os.getenv("YMOT_TOKEN")
-YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
+DEFAULT_YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/") # נתיב ברירת מחדל אם הערוץ לא מזוהה
+
+# ---------------------------------------------------------
+# ⚙️ הגדרות ניתוב ערוצים (השינוי שביקשת)
+# כאן מגדירים לאיזו שלוחה תלך ההודעה לפי ה-ID של הערוץ
+# ---------------------------------------------------------
+CHANNEL_SETTINGS = {
+    # דוגמא: ID של ערוץ : נתיב בימות המשיח
+    -1002710964688: "ivr2:/988/",  # ערוץ קיים (דוגמה מהקוד שלך)
+    -1003579694794: "ivr2:/22/",   # דוגמה לערוץ A
+    -1003562922585: "ivr2:/33/",   # דוגמה לערוץ B
+    # תוסיף כאן עוד ערוצים לפי הצורך
+}
 
 # 🟡 הגדרות קבועות
 CHUNK_SIZE = 1 * 1024 * 1024  # 1MB
@@ -158,8 +170,12 @@ def maybe_remove_files(*filenames):
                 print(f"⚠️ שגיאה במחיקת קובץ {f}: {e}")
 
 
-def upload_to_ymot(file_path):
-    # ... (פונקציית העלאה לימות המשיח) ...
+def upload_to_ymot(file_path, target_path):
+    """
+    פונקציה להעלאת קבצים לימות המשיח.
+    קיבלה עדכון לקבל את 'target_path' כפרמטר כדי לתמוך בניתוב לפי ערוצים.
+    """
+    print(f"📡 מעלה קובץ לשלוחה: {target_path}")
     file_size = os.path.getsize(file_path)
 
     if file_size <= 50 * 1024 * 1024:
@@ -168,7 +184,7 @@ def upload_to_ymot(file_path):
             files = {"file": (os.path.basename(file_path), f, "audio/wav")}
             data = {
                 "token": YMOT_TOKEN,
-                "path": YMOT_PATH,
+                "path": target_path,
                 "convertAudio": 1,
                 "autoNumbering": "true",
                 "uploader": "yemot-admin"
@@ -190,7 +206,7 @@ def upload_to_ymot(file_path):
                 files = {"qqfile": chunk}
                 data = {
                     "token": YMOT_TOKEN,
-                    "path": YMOT_PATH,
+                    "path": target_path,
                     "convertAudio": 0,
                     "autoNumbering": "true",
                     "uploader": "yemot-admin",
@@ -225,7 +241,7 @@ def upload_to_ymot(file_path):
         # 🔹 בקשת סיום
         data = {
             "token": YMOT_TOKEN,
-            "path": YMOT_PATH,
+            "path": target_path,
             "convertAudio": 0,
             "autoNumbering": "true",
             "uploader": "yemot-admin",
@@ -254,14 +270,21 @@ def upload_to_ymot(file_path):
 # 🟡 UserBot
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
 
-
-@app.on_message(filters.chat(-1002710964688))
+# שינוי: מאזין לכל הערוצים כדי שנוכל לסנן לפי ID בפנים, או שניתן להשאיר פילטר ספציפי
+# אם אתה רוצה להאזין לכל הערוצים שהבוט נמצא בהם, השתמש ב-filters.channel
+@app.on_message(filters.channel)
 async def handle_message(client, message):
     
     # 🛑 תיקון 2: התעלמות מהודעות תגובה כדי למנוע KeyError ב-Pyrogram
     if message.reply_to_message:
         print("⏭️ מדלג על הודעה: זוהי תגובה להודעה אחרת.")
         return
+
+    # --- לוגיקה חדשה: זיהוי ערוץ וקביעת שלוחה ---
+    chat_id = message.chat.id
+    target_ymot_path = CHANNEL_SETTINGS.get(chat_id, DEFAULT_YMOT_PATH)
+    print(f"📩 התקבלה הודעה מערוץ: {chat_id} | מעביר לשלוחה: {target_ymot_path}")
+    # ---------------------------------------------
 
     text = message.text or message.caption
     has_video = message.video is not None
@@ -303,16 +326,21 @@ async def handle_message(client, message):
                 text_to_mp3(full_text, TTS_MP3)
                 convert_to_wav(TTS_MP3, TTS_WAV)
 
-                # 3. חיבור TTS ואודיו הווידאו
-                concat_wav_files(TTS_WAV, VIDEO_WAV, FINAL_WAV)
+                # --- שינוי: ביטול החיבור והעלאה בנפרד ---
+                
+                # העלאת קובץ הטקסט (ההקראה)
+                print("⬆️ מעלה את קובץ הטקסט (TTS)...")
+                upload_to_ymot(TTS_WAV, target_ymot_path)
 
-                # 4. העלאה לימות המשיח
-                upload_to_ymot(FINAL_WAV)
-                print("✅ וידאו וטקסט משולבים הועלו בהצלחה!")
+                # העלאת קובץ האודיו של הוידאו
+                print("⬆️ מעלה את קובץ האודיו של הוידאו...")
+                upload_to_ymot(VIDEO_WAV, target_ymot_path)
+                
+                print("✅ וידאו וטקסט הועלו כשני קבצים נפרדים בהצלחה!")
             else:
                 # אם אין טקסט נקי, מטפל בזה רק כווידאו רגיל
                 print("⚠️ הטקסט נוקה לחלוטין (ריק). מעלה רק את הווידאו.")
-                upload_to_ymot(VIDEO_WAV)
+                upload_to_ymot(VIDEO_WAV, target_ymot_path)
                 print("✅ וידאו בלבד הועלה בהצלחה.")
 
         except Exception as e:
@@ -335,7 +363,7 @@ async def handle_message(client, message):
             downloaded_video_path = await message.download(file_name=VIDEO_FILE)
             wav_file = VIDEO_WAV
             convert_to_wav(downloaded_video_path, wav_file)
-            upload_to_ymot(wav_file)
+            upload_to_ymot(wav_file, target_ymot_path)
             print("✅ וידאו בלבד הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בווידאו בלבד: {e}")
@@ -354,7 +382,7 @@ async def handle_message(client, message):
             downloaded_audio_path = await message.download(file_name="voice.ogg")
             wav_file = OUTPUT_WAV
             convert_to_wav(downloaded_audio_path, wav_file)
-            upload_to_ymot(wav_file)
+            upload_to_ymot(wav_file, target_ymot_path)
             print("✅ קול הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בהודעת קול: {e}")
@@ -372,7 +400,7 @@ async def handle_message(client, message):
             downloaded_audio_path = await message.download(file_name=message.audio.file_name or "audio.mp3")
             wav_file = OUTPUT_WAV
             convert_to_wav(downloaded_audio_path, wav_file)
-            upload_to_ymot(wav_file)
+            upload_to_ymot(wav_file, target_ymot_path)
             print("✅ אודיו הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בקובץ אודיו: {e}")
@@ -394,7 +422,7 @@ async def handle_message(client, message):
                 full_text = create_full_text(cleaned_for_tts)
                 text_to_mp3(full_text, OUTPUT_MP3)
                 convert_to_wav(OUTPUT_MP3, OUTPUT_WAV)
-                upload_to_ymot(OUTPUT_WAV)
+                upload_to_ymot(OUTPUT_WAV, target_ymot_path)
                 print("✅ טקסט הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בטקסט בלבד: {e}")
