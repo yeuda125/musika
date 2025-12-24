@@ -304,12 +304,12 @@ async def handle_message(client, message):
                 text_to_mp3(full_text, TTS_MP3)
                 convert_to_wav(TTS_MP3, TTS_WAV)
 
-                # העלאה בנפרד (טקסט ואז וידאו)
-                print("⬆️ מעלה את קובץ הטקסט (TTS)...")
-                upload_to_ymot(TTS_WAV, target_ymot_path)
-
+                # העלאה בנפרד (קודם וידאו ואז טקסט)
                 print("⬆️ מעלה את קובץ האודיו של הוידאו...")
                 upload_to_ymot(VIDEO_WAV, target_ymot_path)
+                
+                print("⬆️ מעלה את קובץ הטקסט (TTS)...")
+                upload_to_ymot(TTS_WAV, target_ymot_path)
                 
                 print("✅ וידאו וטקסט הועלו כשני קבצים נפרדים בהצלחה!")
             else:
