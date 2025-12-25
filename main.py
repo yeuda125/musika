@@ -89,7 +89,7 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
                 time.sleep(1)
                 uploaded = genai.get_file(uploaded.name)
             
-            prompt = "תמלל את קובץ האודיו הבא לעברית. הוסף סימני פיסוק מלאים, וכתוב את ההודעה מחדש שיהיה ניתן להבין את הדיווח."
+            prompt = "תמלל את קובץ האודיו הבא לעברית. ונסח את ההודעה מחדש שיהיה ניתן להבין את הדיווח או את ההודעה. הקפד לא להוסיף דברים שלא נאמרו בהודעה. אם הקובץ ריק שלח 'אין כאן מה לתמלל'."
             result = model.generate_content([prompt, uploaded])
             return result.text
 
