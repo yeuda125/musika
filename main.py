@@ -89,7 +89,7 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
                 time.sleep(1)
                 uploaded = genai.get_file(uploaded.name)
             
-            prompt = "תמלל את קובץ האודיו הבא לעברית. ונסח את ההודעה מחדש שיהיה ניתן להבין את הדיווח או את ההודעה. הקפד לא להוסיף דברים שלא נאמרו בהודעה. אם הקובץ ריק שלח 'אין כאן מה לתמלל'."
+            prompt = "נסח את ההודעה מחדש שיהיה ניתן להבין אותה. הקפד לא להוסיף דברים שלא נאמרו בהודעה. אם הקובץ ריק שלח 'אין כאן שום דיווח"'."
             result = model.generate_content([prompt, uploaded])
             return result.text
 
@@ -120,6 +120,12 @@ def clean_text(text):
         "לכל העדכונים",
         "לשיתוף",
         "בWhatsApp",
+        "בטלגרם",
+        "הכי חם ברשת",
+        "הערינג",
+        "055-675-3075",
+        "לשליחת חומרים",
+        "וואטצפ",
         "מה שמעניין",
         "בוואטסאפ",
         "ובטלגרם",
