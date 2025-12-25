@@ -89,7 +89,13 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
                 time.sleep(1)
                 uploaded = genai.get_file(uploaded.name)
             
-            prompt = "תמלל את קובץ האודיו הבא לעברית והחזר אותו מנוסח מחדש בצורה קריאה וברורה. אם הקובץ ריק החזר 'אין כאן שום דיווח'."
+            prompt = """
+            תפקידך: אתה מערכת תמלול לדיווחים.
+            בצע תמלול מלא של האודיו לעברית.
+            ערוך את הטקסט כך שיהיה קריא ומנוסח בצורה ברורה.
+            אל תנהל שיחה. פלוט אך ורק את הטקסט המתומלל.
+            אם אין דיבור, כתוב: "לא זוהה דיבור".
+            """
             result = model.generate_content([prompt, uploaded])
             return result.text
 
