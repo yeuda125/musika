@@ -105,7 +105,7 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
         if text_result:
             await client.send_message(
                 chat_id, 
-                f"🎙️ **תמלול אוטומטי:**\n\n{text_result}",
+                text_result,
                 reply_to_message_id=message_id
             )
             print("✅ תמלול נשלח בהצלחה.")
