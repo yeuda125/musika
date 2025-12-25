@@ -89,7 +89,7 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
                 time.sleep(1)
                 uploaded = genai.get_file(uploaded.name)
             
-            prompt = "נסח את ההודעה מחדש שיהיה ניתן להבין אותה. הקפד לא להוסיף דברים שלא נאמרו בהודעה. אם הקובץ ריק שלח 'אין כאן שום דיווח"'."
+            prompt = "נסח את ההודעה מחדש שיהיה ניתן להבין אותה. הקפד לא להוסיף דברים שלא נאמרו בהודעה. אם הקובץ ריק שלח 'אין כאן שום דיווח",
             result = model.generate_content([prompt, uploaded])
             return result.text
 
