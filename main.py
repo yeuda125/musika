@@ -79,7 +79,7 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
         
         # הרצת גמיני ב-Thread נפרד כדי לא לתקוע את הבוט
         # שימוש במודל Flash המהיר
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         
         # פונקציה פנימית לביצוע הפעולה מול גוגל
         def run_sync_api():
