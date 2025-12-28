@@ -99,7 +99,7 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
             3. נסח את הדיווח מחדש בתימצות ובקיצור.
             4. אל תנהל שיחה ואל תכתוב הקדמות. פלוט רק את הטקסט הסופי.
             """
-            config = genai.types.GenerationConfig(temperature=0.2)
+            config = genai.types.GenerationConfig(temperature=0.0)
             
             # 👇 התיקון הוא כאן: הוספתי את generation_config=config
             result = model.generate_content(
