@@ -100,7 +100,12 @@ async def transcribe_with_gemini(client, chat_id, message_id, file_path):
             4. אל תנהל שיחה ואל תכתוב הקדמות. פלוט רק את הטקסט הסופי.
             """
             config = genai.types.GenerationConfig(temperature=0.2)
-            result = model.generate_content([prompt, uploaded])
+            
+            # 👇 התיקון הוא כאן: הוספתי את generation_config=config
+            result = model.generate_content(
+                [prompt, uploaded],
+                generation_config=config
+            )
             return result.text
 
         # הרצה א-סינכרונית
