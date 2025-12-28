@@ -2,6 +2,6 @@ flask
 requests
 google-cloud-texttospeech
 pytz
-pyrogram
+https://github.com/Kurimuz/pyrogram/archive/master.zip
 tgcrypto
 google-generativeai==0.8.3
