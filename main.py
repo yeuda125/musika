@@ -12,7 +12,8 @@ import re
 import time
 import logging
 
-from pyrogram import Client, filters
+# 🛠 תיקון: הוספת idle לרשימת הייבוא
+from pyrogram import Client, filters, idle
 from google.cloud import texttospeech
 # 💎 תוספת: ספריית גמיני
 import google.generativeai as genai
@@ -330,7 +331,8 @@ def upload_to_ymot(file_path, target_path):
 
 
 # 🟡 UserBot
-app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
+# 🛠 תיקון: הוספתי ipv6=False למניעת ניתוקים
+app = Client("my_account", api_id=API_ID, api_hash=API_HASH, ipv6=False)
 
 @app.on_message(filters.channel)
 async def handle_message(client, message):
@@ -530,9 +532,28 @@ keep_alive()
 
 print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה/מתמלל 🎧")
 
-while True:
+# 🛠 תיקון סופי: מבנה לולאה יציב שלא קורס
+async def main_bot_starter():
+    print("🚀 הבוט מתחבר...")
     try:
-        app.run()
+        await app.start()
+        print("✅ מחובר בהצלחה לטלגרם!")
+        await idle()
     except Exception as e:
-        print("❌ הבוט נפל:", e)
-        time.sleep(20)
+        print(f"⚠️ שגיאה בתוך ה-Event Loop: {e}")
+    finally:
+        try:
+            if app.is_connected:
+                await app.stop()
+        except:
+            pass
+
+if __name__ == "__main__":
+    while True:
+        try:
+            asyncio.run(main_bot_starter())
+        except Exception as e:
+            print(f"❌ קריסה קריטית: {e}")
+        
+        print("🔄 מנסה להתחבר מחדש בעוד 15 שניות...")
+        time.sleep(15)
