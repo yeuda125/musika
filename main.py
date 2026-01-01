@@ -10,16 +10,9 @@ import pytz
 import asyncio
 import re
 import time
-import logging
 
-# 🛠 תיקון: הוספת idle לרשימת הייבוא
-from pyrogram import Client, filters, idle
+from pyrogram import Client, filters
 from google.cloud import texttospeech
-# 💎 תוספת: ספריית גמיני
-import google.generativeai as genai
-
-# הגדרת לוגים בסיסית (כדי שנראה שגיאות אם יש)
-logging.basicConfig(level=logging.INFO)
 
 # 🟡 כתיבת קובץ מפתח Google מ־BASE64
 key_b64 = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_B64")
@@ -40,16 +33,9 @@ YMOT_TOKEN = os.getenv("YMOT_TOKEN")
 # נתיב ברירת מחדל (נשאר כמשתנה סביבה אך לא בשימוש כ-Fallback בקוד הזה לאור הבקשה)
 DEFAULT_YMOT_PATH = os.getenv("YMOT_PATH", "ivr2:/988/")
 
-# 💎 תוספת: הגדרת מפתח גמיני
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    print("⚠️ אזהרה: מפתח GEMINI_API_KEY לא מוגדר. התמלול לא יפעל.")
-
 # ---------------------------------------------------------
-# ⚙️ הגדרות ניתוב ערוצים (ימות המשיח)
-# רק ערוצים שמופיעים כאן יטופלו עבור העלאה לימות המשיח.
+# ⚙️ הגדרות ניתוב ערוצים
+# רק ערוצים שמופיעים כאן יטופלו. הבוט יתעלם מכל השאר.
 # ---------------------------------------------------------
 CHANNEL_SETTINGS = {
     # דוגמא: ID של ערוץ : נתיב בימות המשיח
@@ -57,72 +43,12 @@ CHANNEL_SETTINGS = {
     -1003482327489: "ivr2:/11/",   # דוגמה לערוץ A
     -1003579694794: "ivr2:/22/",   # דוגמה לערוץ B
     -1003562922585: "ivr2:/33/",   # דוגמה לערוץ C
+    # חובה להוסיף כאן את כל הערוצים שאתה רוצה שהבוט יעבוד בהם
 }
-
-# ---------------------------------------------------------
-# 🎙️ הגדרות ערוץ תמלול (גמיני)
-# ערוץ זה ישמש אך ורק לתמלול (לא יעלה קבצים לימות המשיח)
-# ---------------------------------------------------------
-# ✏️ החלף את המספר כאן ב-ID של הערוץ שמיועד לתמלול בלבד!
-TRANSCRIBE_CHANNEL_ID = -1003560462359 
 
 # 🟡 הגדרות קבועות
 CHUNK_SIZE = 1 * 1024 * 1024  # 1MB
 UPLOAD_URL = "https://call2all.co.il/ym/api/UploadFile"
-
-# 💎 פונקציה חדשה לתמלול (לא נוגעת בלוגיקה של ימות המשיח)
-async def transcribe_with_gemini(client, chat_id, message_id, file_path):
-    if not GEMINI_API_KEY:
-        return
-
-    try:
-        print(f"🎙️ מתחיל תמלול גמיני לקובץ: {file_path}")
-        
-        # הרצת גמיני ב-Thread נפרד כדי לא לתקוע את הבוט
-        # שימוש במודל Flash המהיר
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        
-        # פונקציה פנימית לביצוע הפעולה מול גוגל
-        def run_sync_api():
-            uploaded = genai.upload_file(file_path)
-            # המתנה לעיבוד הקובץ בגוגל
-            while uploaded.state.name == "PROCESSING":
-                time.sleep(1)
-                uploaded = genai.get_file(uploaded.name)
-            
-            prompt = """
-            תפקידך: אתה עורך תוכן בקו נייעס (חדשות) במגזר החרדי.
-            קיבלת הקלטה קולית ממאזין. עליך להוציא ממנה את הדיווח.
-
-            הנחיות קריטיות:
-            1. אם המאזין מדבר לא ברור, בולע מילים או שיש רעש - אל תנסה לנחש! כתוב רק מה ששמעת בבירור.
-            2. אם ההודעה כולה לא ברורה, או ללא מלל, או נשמעת כמו רעש/כיס/טעות - כתוב: "הודעה לא ברורה (רעש/מלמול)".
-            3. נסח את הדיווח מחדש בתימצות ובקיצור.
-            4. אל תנהל שיחה ואל תכתוב הקדמות. פלוט רק את הטקסט הסופי.
-            """
-            config = genai.types.GenerationConfig(temperature=0.0)
-            
-            # 👇 התיקון הוא כאן: הוספתי את generation_config=config
-            result = model.generate_content(
-                [prompt, uploaded],
-                generation_config=config
-            )
-            return result.text
-
-        # הרצה א-סינכרונית
-        text_result = await asyncio.to_thread(run_sync_api)
-        
-        # שליחת התגובה לטלגרם
-        if text_result:
-            await client.send_message(
-                chat_id, 
-                text_result,
-                reply_to_message_id=message_id
-            )
-            print("✅ תמלול נשלח בהצלחה.")
-
-    except Exception as e:
-        print(f"❌ שגיאה בתהליך התמלול: {e}")
 
 
 def clean_text(text):
@@ -136,18 +62,7 @@ def clean_text(text):
         "לכל העדכונים",
         "לשיתוף",
         "בWhatsApp",
-        "בטלגרם",
-        "הכי חם ברשת",
-        "הערינג",
-        "055-675-3075",
-        "לשליחת חומרים",
-        "וואטצפ",
         "מה שמעניין",
-        "ערוץ הכתבות החדש מבית",
-        "כל העדכונים בקבוצה",
-        "לשליחת חומר ופרסום",
-        "בהתחייבות על דיסקרטיות מלאה",
-        "0526356326",
         "בוואטסאפ",
         "ובטלגרם",
         "צאפ מגזין",
@@ -331,30 +246,21 @@ def upload_to_ymot(file_path, target_path):
 
 
 # 🟡 UserBot
-# 🛠 תיקון: הוספתי ipv6=False למניעת ניתוקים
-app = Client("my_account", api_id=API_ID, api_hash=API_HASH, ipv6=False)
+app = Client("my_account", api_id=API_ID, api_hash=API_HASH)
 
 @app.on_message(filters.channel)
 async def handle_message(client, message):
     
+    # 🛑 בדיקה מקדימה: האם הערוץ ברשימה המותרת?
     chat_id = message.chat.id
-    
-    # 📌 בדיקה לאיזה סוג ערוץ שייכת ההודעה
-    is_ymot_channel = chat_id in CHANNEL_SETTINGS
-    is_transcribe_channel = chat_id == TRANSCRIBE_CHANNEL_ID
-    
-    # אם הערוץ לא מוגדר באף אחת מהרשימות - מתעלמים
-    if not is_ymot_channel and not is_transcribe_channel:
+    if chat_id not in CHANNEL_SETTINGS:
+        # אם ה-ID לא ברשימה - הבוט מתעלם לגמרי ויוצא מהפונקציה
         print(f"🚫 הודעה מערוץ לא מוגדר ({chat_id}) - מתעלם.")
         return
 
-    # שליפת נתיב לימות (רק אם זה ערוץ ימות)
-    target_ymot_path = CHANNEL_SETTINGS.get(chat_id)
-    
-    if is_ymot_channel:
-        print(f"📩 ימות המשיח: הודעה מערוץ {chat_id} | מעביר לשלוחה: {target_ymot_path}")
-    elif is_transcribe_channel:
-        print(f"📩 תמלול: הודעה מערוץ {chat_id} | מעביר לגמיני")
+    # אם הגענו לפה, הערוץ מוכר. שולף את השלוחה המתאימה
+    target_ymot_path = CHANNEL_SETTINGS[chat_id]
+    print(f"📩 התקבלה הודעה מערוץ: {chat_id} | מעביר לשלוחה: {target_ymot_path}")
 
     # 🛑 התעלמות מהודעות תגובה
     if message.reply_to_message:
@@ -388,34 +294,28 @@ async def handle_message(client, message):
             downloaded_video_path = await message.download(file_name=VIDEO_FILE)
             convert_to_wav(downloaded_video_path, VIDEO_WAV)
 
-            # --- לוגיקת תמלול ---
-            if is_transcribe_channel:
-                await transcribe_with_gemini(client, chat_id, message.id, VIDEO_WAV)
+            # 2. עיבוד הטקסט והמרתו ל־WAV (TTS)
+            cleaned_text = clean_text(text)
+            cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
+            cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
-            # --- לוגיקת ימות המשיח ---
-            if is_ymot_channel:
-                # 2. עיבוד הטקסט והמרתו ל־WAV (TTS)
-                cleaned_text = clean_text(text)
-                cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
-                cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
+            if cleaned_for_tts:
+                full_text = create_full_text(cleaned_for_tts)
+                text_to_mp3(full_text, TTS_MP3)
+                convert_to_wav(TTS_MP3, TTS_WAV)
 
-                if cleaned_for_tts:
-                    full_text = create_full_text(cleaned_for_tts)
-                    text_to_mp3(full_text, TTS_MP3)
-                    convert_to_wav(TTS_MP3, TTS_WAV)
-
-                    # העלאה בנפרד (קודם וידאו ואז טקסט)
-                    print("⬆️ מעלה את קובץ האודיו של הוידאו...")
-                    upload_to_ymot(VIDEO_WAV, target_ymot_path)
-                    
-                    print("⬆️ מעלה את קובץ הטקסט (TTS)...")
-                    upload_to_ymot(TTS_WAV, target_ymot_path)
-                    
-                    print("✅ וידאו וטקסט הועלו כשני קבצים נפרדים בהצלחה!")
-                else:
-                    print("⚠️ הטקסט נוקה לחלוטין (ריק). מעלה רק את הווידאו.")
-                    upload_to_ymot(VIDEO_WAV, target_ymot_path)
-                    print("✅ וידאו בלבד הועלה בהצלחה.")
+                # העלאה בנפרד (קודם וידאו ואז טקסט)
+                print("⬆️ מעלה את קובץ האודיו של הוידאו...")
+                upload_to_ymot(VIDEO_WAV, target_ymot_path)
+                
+                print("⬆️ מעלה את קובץ הטקסט (TTS)...")
+                upload_to_ymot(TTS_WAV, target_ymot_path)
+                
+                print("✅ וידאו וטקסט הועלו כשני קבצים נפרדים בהצלחה!")
+            else:
+                print("⚠️ הטקסט נוקה לחלוטין (ריק). מעלה רק את הווידאו.")
+                upload_to_ymot(VIDEO_WAV, target_ymot_path)
+                print("✅ וידאו בלבד הועלה בהצלחה.")
 
         except Exception as e:
             print(f"❌ שגיאה בטיפול בווידאו וטקסט משולב: {e}")
@@ -435,16 +335,8 @@ async def handle_message(client, message):
             downloaded_video_path = await message.download(file_name=VIDEO_FILE)
             wav_file = VIDEO_WAV
             convert_to_wav(downloaded_video_path, wav_file)
-            
-            # --- לוגיקת תמלול ---
-            if is_transcribe_channel:
-                await transcribe_with_gemini(client, chat_id, message.id, wav_file)
-            
-            # --- לוגיקת ימות המשיח ---
-            if is_ymot_channel:
-                upload_to_ymot(wav_file, target_ymot_path)
-                print("✅ וידאו בלבד הועלה בהצלחה.")
-                
+            upload_to_ymot(wav_file, target_ymot_path)
+            print("✅ וידאו בלבד הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בווידאו בלבד: {e}")
         finally:
@@ -461,16 +353,8 @@ async def handle_message(client, message):
             downloaded_audio_path = await message.download(file_name="voice.ogg")
             wav_file = OUTPUT_WAV
             convert_to_wav(downloaded_audio_path, wav_file)
-            
-            # --- לוגיקת תמלול ---
-            if is_transcribe_channel:
-                await transcribe_with_gemini(client, chat_id, message.id, wav_file)
-
-            # --- לוגיקת ימות המשיח ---
-            if is_ymot_channel:
-                upload_to_ymot(wav_file, target_ymot_path)
-                print("✅ קול הועלה בהצלחה.")
-                
+            upload_to_ymot(wav_file, target_ymot_path)
+            print("✅ קול הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בהודעת קול: {e}")
         finally:
@@ -486,16 +370,8 @@ async def handle_message(client, message):
             downloaded_audio_path = await message.download(file_name=message.audio.file_name or "audio.mp3")
             wav_file = OUTPUT_WAV
             convert_to_wav(downloaded_audio_path, wav_file)
-            
-            # --- לוגיקת תמלול ---
-            if is_transcribe_channel:
-                await transcribe_with_gemini(client, chat_id, message.id, wav_file)
-            
-            # --- לוגיקת ימות המשיח ---
-            if is_ymot_channel:
-                upload_to_ymot(wav_file, target_ymot_path)
-                print("✅ אודיו הועלה בהצלחה.")
-                
+            upload_to_ymot(wav_file, target_ymot_path)
+            print("✅ אודיו הועלה בהצלחה.")
         except Exception as e:
             print(f"❌ שגיאה בטיפול בקובץ אודיו: {e}")
         finally:
@@ -506,54 +382,32 @@ async def handle_message(client, message):
 
     # 5. 📝 טקסט בלבד
     if text:
-        # טקסט בלבד מטופל רק עבור ימות המשיח (המרת TTS)
-        # עבור תמלול, אין מה לתמלל בהודעת טקסט, אז מתעלמים
-        if is_ymot_channel:
-            print("▶️ מטפל בטקסט בלבד (ימות)...")
-            try:
-                cleaned_text = clean_text(text)
-                cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
-                cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
+        print("▶️ מטפל בטקסט בלבד...")
+        try:
+            cleaned_text = clean_text(text)
+            cleaned_for_tts = re.sub(r"[^0-9א-ת\s]", "", cleaned_text)
+            cleaned_for_tts = re.sub(r"\s+", " ", cleaned_for_tts).strip()
 
-                if cleaned_for_tts:
-                    full_text = create_full_text(cleaned_for_tts)
-                    text_to_mp3(full_text, OUTPUT_MP3)
-                    convert_to_wav(OUTPUT_MP3, OUTPUT_WAV)
-                    upload_to_ymot(OUTPUT_WAV, target_ymot_path)
-                    print("✅ טקסט הועלה בהצלחה.")
-            except Exception as e:
-                print(f"❌ שגיאה בטיפול בטקסט בלבד: {e}")
-            finally:
-                maybe_remove_files(OUTPUT_MP3, OUTPUT_WAV)
+            if cleaned_for_tts:
+                full_text = create_full_text(cleaned_for_tts)
+                text_to_mp3(full_text, OUTPUT_MP3)
+                convert_to_wav(OUTPUT_MP3, OUTPUT_WAV)
+                upload_to_ymot(OUTPUT_WAV, target_ymot_path)
+                print("✅ טקסט הועלה בהצלחה.")
+        except Exception as e:
+            print(f"❌ שגיאה בטיפול בטקסט בלבד: {e}")
+        finally:
+            maybe_remove_files(OUTPUT_MP3, OUTPUT_WAV)
 
 
 from keep_alive import keep_alive
 keep_alive()
 
-print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה/מתמלל 🎧")
+print("🚀 הבוט מאזין לערוץ ומעלה לשלוחה 🎧")
 
-# 🛠 תיקון סופי: מבנה לולאה יציב שלא קורס
-async def main_bot_starter():
-    print("🚀 הבוט מתחבר...")
+while True:
     try:
-        await app.start()
-        print("✅ מחובר בהצלחה לטלגרם!")
-        await idle()
+        app.run()
     except Exception as e:
-        print(f"⚠️ שגיאה בתוך ה-Event Loop: {e}")
-    finally:
-        try:
-            if app.is_connected:
-                await app.stop()
-        except:
-            pass
-
-if __name__ == "__main__":
-    while True:
-        try:
-            asyncio.run(main_bot_starter())
-        except Exception as e:
-            print(f"❌ קריסה קריטית: {e}")
-        
-        print("🔄 מנסה להתחבר מחדש בעוד 15 שניות...")
-        time.sleep(15)
+        print("❌ הבוט נפל:", e)
+        time.sleep(20)
